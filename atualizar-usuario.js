@@ -1,3 +1,4 @@
+require('dotenv').config();
 // Script para trocar o usuário e senha do sistema.
 // Rode UMA VEZ com: node atualizar-usuario.js
 // Depois pode apagar este arquivo.
