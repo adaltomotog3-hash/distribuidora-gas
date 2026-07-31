@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <%- include('partials/head', { titulo: 'Preços' }) %>
+</head>
+<body>
+  <div class="app">
+    <%- include('partials/sidebar', { paginaAtual: 'precos' }) %>
+
+    <div class="conteudo">
+      <div class="topo-pagina">
+        <div>
+          <h1>Preços</h1>
+          <p>Valores usados automaticamente ao registrar uma venda</p>
+        </div>
+      </div>
+
+      <div class="painel">
+        <table>
+          <thead>
+            <tr>
+              <th>Tipo de venda</th>
+              <th>Descrição</th>
+              <th>Preço atual</th>
+              <th>Atualizar</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% precos.forEach(function(p) { %>
+              <tr>
+                <td><%= p.tipo_venda === 'troca' ? 'Com troca' : 'Sem troca' %></td>
+                <td class="texto-suave"><%= p.descricao %></td>
+                <td>R$ <%= Number(p.preco).toFixed(2) %></td>
+                <td>
+                  <form method="POST" action="/precos/<%= p.tipo_venda %>" style="display:flex; gap:8px;">
+                    <input type="number" step="0.01" min="0" name="preco" value="<%= p.preco %>" style="max-width:120px">
+                    <button class="botao botao-pequeno" type="submit">Salvar</button>
+                  </form>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

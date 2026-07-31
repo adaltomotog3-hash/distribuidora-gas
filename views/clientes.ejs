@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <%- include('partials/head', { titulo: 'Clientes' }) %>
+</head>
+<body>
+  <div class="app">
+    <%- include('partials/sidebar', { paginaAtual: 'clientes' }) %>
+
+    <div class="conteudo">
+      <div class="topo-pagina">
+        <div>
+          <h1>Clientes</h1>
+          <p>Cadastro dos seus clientes</p>
+        </div>
+      </div>
+
+      <div class="painel">
+        <div class="painel-titulo">Novo cliente</div>
+        <form method="POST" action="/clientes" class="form-grade">
+          <div>
+            <label>Nome</label>
+            <input type="text" name="nome" required>
+          </div>
+          <div>
+            <label>Telefone</label>
+            <input type="text" name="telefone">
+          </div>
+          <div>
+            <label>Endereço</label>
+            <input type="text" name="endereco">
+          </div>
+          <div>
+            <label>Observação</label>
+            <input type="text" name="observacao">
+          </div>
+          <div class="form-acoes">
+            <button class="botao" type="submit">Cadastrar cliente</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="painel">
+        <div class="painel-titulo">Todos os clientes (<%= clientes.length %>)</div>
+        <% if (clientes.length === 0) { %>
+          <div class="vazio-lista">Nenhum cliente cadastrado ainda.</div>
+        <% } else { %>
+          <table>
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>Telefone</th>
+                <th>Endereço</th>
+                <th>Observação</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% clientes.forEach(function(c) { %>
+                <tr>
+                  <td><%= c.nome %></td>
+                  <td><%= c.telefone || '—' %></td>
+                  <td><%= c.endereco || '—' %></td>
+                  <td class="texto-suave"><%= c.observacao || '—' %></td>
+                  <td>
+                    <form method="POST" action="/clientes/<%= c.id %>/excluir" onsubmit="return confirm('Excluir este cliente?');">
+                      <button class="botao botao-secundario botao-pequeno" type="submit">Excluir</button>
+                    </form>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

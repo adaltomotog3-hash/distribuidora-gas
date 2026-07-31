@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <%- include('partials/head', { titulo: 'Painel' }) %>
+</head>
+<body>
+  <div class="app">
+    <%- include('partials/sidebar', { paginaAtual: 'dashboard' }) %>
+
+    <div class="conteudo">
+      <div class="topo-pagina">
+        <div>
+          <h1>Painel</h1>
+          <p>Resumo do dia e entregas em aberto</p>
+        </div>
+      </div>
+
+      <div class="grade-cards">
+        <div class="card destaque-chama">
+          <div class="rotulo">Botijões cheios em estoque</div>
+          <div class="valor"><%= estoque.qtd_cheios %></div>
+        </div>
+        <div class="card">
+          <div class="rotulo">Botijões vazios em estoque</div>
+          <div class="valor"><%= estoque.qtd_vazios %></div>
+        </div>
+        <div class="card destaque-verde">
+          <div class="rotulo">Vendas hoje</div>
+          <div class="valor"><%= resumoHoje.total_vendas %></div>
+        </div>
+        <div class="card destaque-verde">
+          <div class="rotulo">Faturado hoje</div>
+          <div class="valor">R$ <%= Number(resumoHoje.total_valor).toFixed(2) %></div>
+        </div>
+      </div>
+
+      <div class="painel">
+        <div class="painel-titulo">
+          <span>Aguardando botijão vazio (<%= pendentes.length %>)</span>
+        </div>
+        <% if (pendentes.length === 0) { %>
+          <div class="vazio-lista">Nenhuma entrega pendente. Tudo certo por aqui.</div>
+        <% } else { %>
+          <table>
+            <thead>
+              <tr>
+                <th>Cliente</th>
+                <th>Saiu em</th>
+                <th>Observação</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% pendentes.forEach(function(v) { %>
+                <tr>
+                  <td><%= v.cliente_nome || 'Sem cliente cadastrado' %></td>
+                  <td><%= new Date(v.criado_em).toLocaleString('pt-BR') %></td>
+                  <td class="texto-suave"><%= v.observacao || '—' %></td>
+                  <td>
+                    <form method="POST" action="/vendas/<%= v.id %>/confirmar-vazio">
+                      <button class="botao botao-pequeno" type="submit">Confirmar retorno do vazio</button>
+                    </form>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

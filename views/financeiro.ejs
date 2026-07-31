@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <%- include('partials/head', { titulo: 'Financeiro' }) %>
+</head>
+<body>
+  <div class="app">
+    <%- include('partials/sidebar', { paginaAtual: 'financeiro' }) %>
+
+    <div class="conteudo">
+      <div class="topo-pagina">
+        <div>
+          <h1>Financeiro</h1>
+          <p>Tudo que foi vendido, calculado automaticamente</p>
+        </div>
+      </div>
+
+      <div class="painel">
+        <form method="GET" action="/financeiro" class="form-grade">
+          <div>
+            <label>De</label>
+            <input type="date" name="inicio" value="<%= dataInicio %>">
+          </div>
+          <div>
+            <label>Até</label>
+            <input type="date" name="fim" value="<%= dataFim %>">
+          </div>
+          <div class="form-acoes">
+            <button class="botao" type="submit">Filtrar período</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="grade-cards">
+        <div class="card destaque-verde">
+          <div class="rotulo">Total de vendas no período</div>
+          <div class="valor"><%= totalGeral.total_vendas %></div>
+        </div>
+        <div class="card destaque-verde">
+          <div class="rotulo">Valor total no período</div>
+          <div class="valor">R$ <%= Number(totalGeral.total_valor).toFixed(2) %></div>
+        </div>
+        <div class="card">
+          <div class="rotulo">Pendentes (aguardando vazio)</div>
+          <div class="valor"><%= pendentesFinanceiro.total %> · R$ <%= Number(pendentesFinanceiro.valor).toFixed(2) %></div>
+        </div>
+      </div>
+
+      <div class="painel">
+        <div class="painel-titulo">Por forma de pagamento</div>
+        <table>
+          <thead><tr><th>Forma</th><th>Qtd. vendas</th><th>Total</th></tr></thead>
+          <tbody>
+            <% porFormaPagamento.forEach(function(f) { %>
+              <tr>
+                <td><%= f.forma_pagamento %></td>
+                <td><%= f.total_vendas %></td>
+                <td>R$ <%= Number(f.total_valor).toFixed(2) %></td>
+              </tr>
+            <% }) %>
+            <% if (porFormaPagamento.length === 0) { %>
+              <tr><td colspan="3" class="vazio-lista">Nenhuma venda no período.</td></tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="painel">
+        <div class="painel-titulo">Por tipo de venda</div>
+        <table>
+          <thead><tr><th>Tipo</th><th>Qtd. vendas</th><th>Total</th></tr></thead>
+          <tbody>
+            <% porTipo.forEach(function(t) { %>
+              <tr>
+                <td><%= t.tipo_venda === 'troca' ? 'Com troca' : 'Sem troca' %></td>
+                <td><%= t.total_vendas %></td>
+                <td>R$ <%= Number(t.total_valor).toFixed(2) %></td>
+              </tr>
+            <% }) %>
+            <% if (porTipo.length === 0) { %>
+              <tr><td colspan="3" class="vazio-lista">Nenhuma venda no período.</td></tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

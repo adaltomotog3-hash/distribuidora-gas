@@ -1,0 +1,16 @@
+<div class="sidebar">
+  <div class="marca"><img src="/img/logo-td.png" alt="Logo" class="logo-sidebar"></div>
+
+  <a class="nav-item <%= paginaAtual === 'dashboard' ? 'ativo' : '' %>" href="/">Painel</a>
+  <a class="nav-item <%= paginaAtual === 'vendas' ? 'ativo' : '' %>" href="/vendas">Vendas</a>
+  <a class="nav-item <%= paginaAtual === 'clientes' ? 'ativo' : '' %>" href="/clientes">Clientes</a>
+  <a class="nav-item <%= paginaAtual === 'estoque' ? 'ativo' : '' %>" href="/estoque">Estoque</a>
+  <a class="nav-item <%= paginaAtual === 'precos' ? 'ativo' : '' %>" href="/precos">Preços</a>
+  <a class="nav-item <%= paginaAtual === 'financeiro' ? 'ativo' : '' %>" href="/financeiro">Financeiro</a>
+
+  <div class="sidebar-rodape">
+    <form action="/logout" method="POST">
+      <button class="botao-sair" type="submit">Sair</button>
+    </form>
+  </div>
+</div>

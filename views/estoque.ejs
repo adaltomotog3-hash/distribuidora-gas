@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <%- include('partials/head', { titulo: 'Estoque' }) %>
+</head>
+<body>
+  <div class="app">
+    <%- include('partials/sidebar', { paginaAtual: 'estoque' }) %>
+
+    <div class="conteudo">
+      <div class="topo-pagina">
+        <div>
+          <h1>Estoque</h1>
+          <p>Controle de botijões cheios e vazios</p>
+        </div>
+      </div>
+
+      <div class="grade-cards">
+        <div class="card destaque-chama">
+          <div class="rotulo">Cheios</div>
+          <div class="valor"><%= estoque.qtd_cheios %></div>
+        </div>
+        <div class="card">
+          <div class="rotulo">Vazios</div>
+          <div class="valor"><%= estoque.qtd_vazios %></div>
+        </div>
+      </div>
+
+      <div class="painel">
+        <div class="painel-titulo">Entrada de botijões cheios (compra do fornecedor)</div>
+        <form method="POST" action="/estoque/entrada-cheio" class="form-grade">
+          <div>
+            <label>Quantidade</label>
+            <input type="number" min="1" name="quantidade" required>
+          </div>
+          <div>
+            <label>Observação</label>
+            <input type="text" name="observacao" placeholder="Ex: compra do fornecedor X">
+          </div>
+          <div class="form-acoes">
+            <button class="botao" type="submit">Registrar entrada</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="painel">
+        <div class="painel-titulo">Ajuste manual de vazios</div>
+        <form method="POST" action="/estoque/entrada-vazio" class="form-grade">
+          <div>
+            <label>Adicionar vazios</label>
+            <input type="number" min="1" name="quantidade">
+          </div>
+          <div>
+            <label>Observação</label>
+            <input type="text" name="observacao">
+          </div>
+          <div class="form-acoes">
+            <button class="botao botao-secundario" type="submit">Adicionar vazios</button>
+          </div>
+        </form>
+        <form method="POST" action="/estoque/saida-vazio" class="form-grade" style="border-top:1px solid var(--borda)">
+          <div>
+            <label>Retirar vazios (ex: devolvidos ao fornecedor)</label>
+            <input type="number" min="1" name="quantidade">
+          </div>
+          <div>
+            <label>Observação</label>
+            <input type="text" name="observacao">
+          </div>
+          <div class="form-acoes">
+            <button class="botao botao-secundario" type="submit">Retirar vazios</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="painel">
+        <div class="painel-titulo">Últimas movimentações</div>
+        <% if (movimentos.length === 0) { %>
+          <div class="vazio-lista">Nenhuma movimentação registrada ainda.</div>
+        <% } else { %>
+          <table>
+            <thead>
+              <tr><th>Tipo</th><th>Quantidade</th><th>Observação</th><th>Data</th></tr>
+            </thead>
+            <tbody>
+              <% movimentos.forEach(function(m) { %>
+                <tr>
+                  <td>
+                    <% const nomes = {entrada_cheio:'Entrada de cheios', entrada_vazio:'Entrada de vazios', saida_cheio:'Saída de cheio (venda)', saida_vazio:'Saída de vazios'}; %>
+                    <%= nomes[m.tipo] || m.tipo %>
+                  </td>
+                  <td><%= m.quantidade %></td>
+                  <td class="texto-suave"><%= m.observacao || '—' %></td>
+                  <td class="texto-suave"><%= new Date(m.criado_em).toLocaleString('pt-BR') %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

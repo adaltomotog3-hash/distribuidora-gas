@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <%- include('partials/head', { titulo: 'Entrar' }) %>
+</head>
+<body>
+  <div class="pagina-login">
+    <div class="caixa-login">
+      <div class="marca-login">
+        <img src="/img/logo-td.png" alt="Logo" class="logo-login">
+      </div>
+
+      <% if (erro) { %>
+        <div class="erro-login"><%= erro %></div>
+      <% } %>
+
+      <form method="POST" action="/login">
+        <label for="username">Usuário</label>
+        <input type="text" id="username" name="username" required autofocus style="margin-bottom:14px">
+
+        <label for="senha">Senha</label>
+        <input type="password" id="senha" name="senha" required style="margin-bottom:20px">
+
+        <button class="botao" type="submit" style="width:100%">Entrar</button>
+      </form>
+    </div>
+  </div>
+</body>
+</html>

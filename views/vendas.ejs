@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <%- include('partials/head', { titulo: 'Vendas' }) %>
+</head>
+<body>
+  <div class="app">
+    <%- include('partials/sidebar', { paginaAtual: 'vendas' }) %>
+
+    <div class="conteudo">
+      <div class="topo-pagina">
+        <div>
+          <h1>Vendas</h1>
+          <p>Registre uma venda e acompanhe as pendentes de troca</p>
+        </div>
+      </div>
+
+      <div class="painel">
+        <div class="painel-titulo">Nova venda</div>
+        <form method="POST" action="/vendas" class="form-grade">
+          <div>
+            <label>Cliente</label>
+            <select name="cliente_id">
+              <option value="">Sem cliente / avulso</option>
+              <% clientes.forEach(function(c) { %>
+                <option value="<%= c.id %>"><%= c.nome %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div>
+            <label>Tipo de venda</label>
+            <select name="tipo_venda" required>
+              <option value="troca">Com troca (aguarda o vazio voltar)</option>
+              <option value="sem_troca">Sem troca (casco novo)</option>
+            </select>
+          </div>
+          <div>
+            <label>Forma de pagamento</label>
+            <select name="forma_pagamento" required>
+              <option value="dinheiro">Dinheiro</option>
+              <option value="pix">Pix</option>
+              <option value="cartao">Cartão</option>
+              <option value="fiado">Fiado</option>
+            </select>
+          </div>
+          <div>
+            <label>Observação</label>
+            <input type="text" name="observacao" placeholder="Ex: entregar até as 18h">
+          </div>
+          <div class="form-acoes">
+            <button class="botao" type="submit">Registrar venda</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="painel">
+        <div class="painel-titulo">Últimas vendas (<%= vendas.length %>)</div>
+        <% if (vendas.length === 0) { %>
+          <div class="vazio-lista">Nenhuma venda registrada ainda.</div>
+        <% } else { %>
+          <table>
+            <thead>
+              <tr>
+                <th>Cliente</th>
+                <th>Tipo</th>
+                <th>Pagamento</th>
+                <th>Valor</th>
+                <th>Observação</th>
+                <th>Status</th>
+                <th>Data</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% vendas.forEach(function(v) { %>
+                <tr>
+                  <td><%= v.cliente_nome || 'Avulso' %></td>
+                  <td><%= v.tipo_venda === 'troca' ? 'Com troca' : 'Sem troca' %></td>
+                  <td><%= v.forma_pagamento %></td>
+                  <td>R$ <%= Number(v.preco).toFixed(2) %></td>
+                  <td class="texto-suave"><%= v.observacao || '—' %></td>
+                  <td>
+                    <% if (v.status === 'aguardando_vazio') { %>
+                      <span class="selo selo-aguardando">Aguardando vazio</span>
+                    <% } else { %>
+                      <span class="selo selo-concluida">Concluída</span>
+                    <% } %>
+                  </td>
+                  <td class="texto-suave"><%= new Date(v.criado_em).toLocaleString('pt-BR') %></td>
+                  <td>
+                    <% if (v.status === 'aguardando_vazio') { %>
+                      <form method="POST" action="/vendas/<%= v.id %>/confirmar-vazio">
+                        <button class="botao botao-pequeno" type="submit">Confirmar vazio</button>
+                      </form>
+                    <% } %>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
