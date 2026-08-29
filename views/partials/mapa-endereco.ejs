@@ -1,0 +1,108 @@
+<!-- Modal com mapa pra marcar a localização exata do cliente (usado na entrega) -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<div class="modal-fundo" id="modal-mapa-endereco">
+  <div class="modal-caixa">
+    <div class="painel-titulo">Marcar localização no mapa</div>
+    <div class="modal-dica">Clique no mapa em cima do ponto exato da entrega. Se o CEP já foi buscado, o mapa tenta centralizar sozinho — senão, procure a rua manualmente.</div>
+    <div id="modal-mapa" class="modal-mapa"></div>
+    <div class="modal-acoes">
+      <button type="button" class="botao botao-secundario" onclick="fecharMapaEndereco()">Cancelar</button>
+      <button type="button" class="botao" onclick="fecharMapaEndereco()">Usar essa localização</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  let _mapaEndereco = null;
+  let _marcadorEndereco = null;
+
+  function _campoEndereco(id) { return document.getElementById(id); }
+
+  function _definirMarcador(lat, lng) {
+    const posicao = [lat, lng];
+    if (_marcadorEndereco) {
+      _marcadorEndereco.setLatLng(posicao);
+    } else {
+      _marcadorEndereco = L.marker(posicao, { draggable: true }).addTo(_mapaEndereco);
+      _marcadorEndereco.on('dragend', function () {
+        const p = _marcadorEndereco.getLatLng();
+        _campoEndereco('campo-latitude').value = p.lat.toFixed(6);
+        _campoEndereco('campo-longitude').value = p.lng.toFixed(6);
+      });
+    }
+    _campoEndereco('campo-latitude').value = lat.toFixed(6);
+    _campoEndereco('campo-longitude').value = lng.toFixed(6);
+  }
+
+  async function abrirMapaEndereco() {
+    document.getElementById('modal-mapa-endereco').classList.add('aberto');
+
+    if (!_mapaEndereco) {
+      _mapaEndereco = L.map('modal-mapa').setView([-14.235, -51.925], 4);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap',
+        maxZoom: 19
+      }).addTo(_mapaEndereco);
+      _mapaEndereco.on('click', function (e) {
+        _definirMarcador(e.latlng.lat, e.latlng.lng);
+      });
+      // O modal começa escondido (display:none), então o Leaflet calcula o
+      // tamanho do mapa errado na primeira vez — corrige assim que abre.
+      setTimeout(function () { _mapaEndereco.invalidateSize(); }, 150);
+    } else {
+      setTimeout(function () { _mapaEndereco.invalidateSize(); }, 50);
+    }
+
+    const latAtual = parseFloat(_campoEndereco('campo-latitude').value);
+    const lngAtual = parseFloat(_campoEndereco('campo-longitude').value);
+
+    if (!isNaN(latAtual) && !isNaN(lngAtual)) {
+      _mapaEndereco.setView([latAtual, lngAtual], 16);
+      _definirMarcador(latAtual, lngAtual);
+      return;
+    }
+
+    // Sem coordenada salva ainda: tenta centralizar pelo endereço digitado
+    const endereco = [
+      _campoEndereco('campo-endereco').value,
+      _campoEndereco('campo-numero').value,
+      _campoEndereco('campo-bairro').value,
+      _campoEndereco('campo-cidade').value,
+      _campoEndereco('campo-uf').value
+    ].filter(Boolean).join(', ');
+
+    if (endereco) {
+      try {
+        const resp = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(endereco));
+        const resultado = await resp.json();
+        if (resultado && resultado[0]) {
+          _mapaEndereco.setView([Number(resultado[0].lat), Number(resultado[0].lon)], 16);
+        }
+      } catch (err) {
+        // Sem internet pro geocode ou API fora do ar — sem problema, o usuário
+        // pode navegar manualmente no mapa e clicar no ponto certo.
+      }
+    }
+  }
+
+  function fecharMapaEndereco() {
+    document.getElementById('modal-mapa-endereco').classList.remove('aberto');
+  }
+
+  async function buscarCep() {
+    const cepDigitado = _campoEndereco('campo-cep').value.replace(/\D/g, '');
+    if (cepDigitado.length !== 8) return;
+    try {
+      const resp = await fetch('https://viacep.com.br/ws/' + cepDigitado + '/json/');
+      const dados = await resp.json();
+      if (dados.erro) return;
+      if (dados.logradouro) _campoEndereco('campo-endereco').value = dados.logradouro;
+      if (dados.bairro) _campoEndereco('campo-bairro').value = dados.bairro;
+      if (dados.localidade) _campoEndereco('campo-cidade').value = dados.localidade;
+      if (dados.uf) _campoEndereco('campo-uf').value = dados.uf;
+    } catch (err) {
+      // Sem internet ou API fora do ar — o atendente preenche na mão mesmo.
+    }
+  }
+</script>

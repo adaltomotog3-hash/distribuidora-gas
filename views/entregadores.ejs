@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <%- include('partials/head', { titulo: 'Entregador' }) %>
+</head>
+<body>
+  <div class="app">
+    <%- include('partials/sidebar', { paginaAtual: 'entregadores' }) %>
+
+    <div class="conteudo">
+
+      <%- include('partials/flash') %>
+      <div class="topo-pagina">
+        <div>
+          <h1>Entregador</h1>
+          <p>Login usado no aplicativo do celular pelo entregador</p>
+        </div>
+      </div>
+
+      <div class="painel">
+        <div class="painel-titulo">Novo entregador</div>
+        <form method="POST" action="/entregadores" class="form-grade">
+          <div>
+            <label>Nome</label>
+            <input type="text" name="nome" required>
+          </div>
+          <div>
+            <label>Usuário (login do app)</label>
+            <input type="text" name="username" required>
+          </div>
+          <div>
+            <label>Senha</label>
+            <input type="text" name="senha" required>
+          </div>
+          <div class="form-acoes">
+            <button class="botao" type="submit">Cadastrar entregador</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="painel">
+        <div class="painel-titulo">Entregadores cadastrados (<%= entregadores.length %>)</div>
+        <% if (entregadores.length === 0) { %>
+          <div class="vazio-lista">Nenhum entregador cadastrado ainda.</div>
+        <% } else { %>
+          <table>
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>Usuário</th>
+                <th>Status</th>
+                <th>Última localização</th>
+                <th>Redefinir senha</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% entregadores.forEach(function(e) { %>
+                <tr>
+                  <td><%= e.nome %></td>
+                  <td class="texto-suave"><%= e.username %></td>
+                  <td>
+                    <% if (e.ativo) { %>
+                      <span class="selo selo-concluida">Ativo</span>
+                    <% } else { %>
+                      <span class="selo selo-aguardando">Bloqueado</span>
+                    <% } %>
+                  </td>
+                  <td class="texto-suave">
+                    <% if (e.ultima_localizacao_em) { %>
+                      <%= new Date(e.ultima_localizacao_em).toLocaleString('pt-BR') %>
+                    <% } else { %>
+                      Sem registro ainda
+                    <% } %>
+                  </td>
+                  <td>
+                    <form method="POST" action="/entregadores/<%= e.id %>/redefinir-senha" style="display:flex; gap:8px;">
+                      <input type="text" name="senha" placeholder="Nova senha" required style="max-width:140px">
+                      <button class="botao botao-secundario botao-pequeno" type="submit">Salvar</button>
+                    </form>
+                  </td>
+                  <td>
+                    <form method="POST" action="/entregadores/<%= e.id %>/alternar-ativo">
+                      <button class="botao botao-secundario botao-pequeno" type="submit"><%= e.ativo ? 'Bloquear' : 'Ativar' %></button>
+                    </form>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

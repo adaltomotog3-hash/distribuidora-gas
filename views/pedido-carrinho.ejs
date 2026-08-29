@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <%- include('partials/head', { titulo: 'Pedido #' + pedido.id }) %>
+</head>
+<body>
+  <div class="app">
+    <%- include('partials/sidebar', { paginaAtual: pedido.status === 'aberto' ? 'pedidos' : 'os' }) %>
+
+    <div class="conteudo">
+
+      <%- include('partials/flash') %>
+
+      <div class="comprovante-cabecalho">
+        <img src="/img/logo-td.png" alt="Logo">
+        <div style="margin-top:6px; font-size:13px;">
+          Comprovante de <%= pedido.status === 'aberto' ? 'pedido' : 'O.S.' %> Nº <%= pedido.id %> —
+          emitido em <%= new Date().toLocaleString('pt-BR') %>
+        </div>
+        <div class="comprovante-detalhes" style="margin-top:10px; font-size:13px; line-height:1.6;">
+          <div><strong>Cliente:</strong> <%= nomeDoPedido(pedido) %><% if (pedido.cliente_telefone) { %> · <%= pedido.cliente_telefone %><% } %></div>
+          <div><strong>Endereço de entrega:</strong> <%= pedido.endereco_entrega || pedido.cliente_endereco || '—' %></div>
+          <div><strong>Forma de pagamento:</strong> <%= pedido.forma_pagamento || '—' %></div>
+        </div>
+        <div style="margin-top:10px; font-size:11px; color:#888;">Documento sem valor fiscal — apenas comprovante interno.</div>
+      </div>
+
+      <div class="topo-pagina">
+        <div>
+          <h1><%= pedido.status === 'aberto' ? 'Pedido' : 'O.S.' %> Nº <%= pedido.id %> — <%= nomeDoPedido(pedido) %></h1>
+          <p>
+            <% if (pedido.status === 'aberto') { %>
+              Carrinho em aberto — vá adicionando os itens que o cliente pedir
+            <% } else if (pedido.status === 'cancelado') { %>
+              <span class="selo selo-cancelada">Cancelada<% if (pedido.cancelado_em) { %> · <%= new Date(pedido.cancelado_em).toLocaleString('pt-BR') %><% } %></span>
+              <% if (pedido.motivo_cancelamento) { %><br><span class="texto-suave" style="font-size:12.5px;">Motivo: <%= pedido.motivo_cancelamento %></span><% } %>
+            <% } else if (pedido.entrega_status === 'entregue') { %>
+              <span class="selo selo-concluida">Entregue · <%= pedido.entregador_nome || 'Escritório' %></span>
+              <% if (pedido.baixado_em) { %>
+                <span class="selo selo-concluida">Baixa dada<% if (pedido.baixado_por) { %> por <%= pedido.baixado_por %><% } %></span>
+              <% } else { %>
+                <span class="selo selo-aguardando">Aguardando baixa</span>
+              <% } %>
+            <% } else { %>
+              <span class="selo selo-aguardando">Aguardando entrega<% if (pedido.entregador_nome) { %> · <%= pedido.entregador_nome %><% } %></span>
+            <% } %>
+          </p>
+        </div>
+        <div class="no-imprimir" style="display:flex; gap:10px; flex-wrap:wrap;">
+          <% if (pedido.status === 'fechado' && pedido.entrega_status === 'pendente') { %>
+            <form method="POST" action="/pedidos/<%= pedido.id %>/finalizar" class="finalizar-form">
+              <input type="hidden" name="latitude">
+              <input type="hidden" name="longitude">
+              <button class="botao" type="submit">📍 Finalizar entrega</button>
+            </form>
+          <% } %>
+          <% if (pedido.status === 'fechado') { %>
+            <button class="botao botao-secundario" type="button" onclick="window.print()">🖨️ Imprimir comprovante</button>
+          <% } %>
+          <% if (pedido.status === 'fechado' && !pedido.baixado_em) { %>
+            <form method="POST" action="/pedidos/<%= pedido.id %>/cancelar-os" class="cancelar-os-form">
+              <input type="hidden" name="motivo">
+              <button class="botao botao-secundario" type="submit">🚫 Cancelar O.S.</button>
+            </form>
+          <% } %>
+          <a class="botao botao-secundario" href="<%= pedido.status === 'aberto' ? '/pedidos' : '/os' %>">‹ Voltar</a>
+        </div>
+      </div>
+
+      <% if (pedido.status === 'fechado') { %>
+        <div class="painel" style="padding:16px 20px;">
+          <div class="form-grade" style="padding:0;">
+            <div>
+              <div class="rotulo">Pagamento</div>
+              <div><%= pedido.forma_pagamento || '—' %></div>
+            </div>
+            <div>
+              <div class="rotulo">Endereço de entrega</div>
+              <div><%= pedido.endereco_entrega || pedido.cliente_endereco || '—' %></div>
+            </div>
+            <div>
+              <div class="rotulo">Observação</div>
+              <div><%= pedido.observacao || '—' %></div>
+            </div>
+            <% if (pedido.entrega_status === 'entregue' && pedido.entrega_lat && pedido.entrega_lng) { %>
+              <div>
+                <div class="rotulo">Local da entrega</div>
+                <div><a target="_blank" href="https://www.google.com/maps?q=<%= pedido.entrega_lat %>,<%= pedido.entrega_lng %>">ver no mapa</a></div>
+              </div>
+            <% } %>
+          </div>
+        </div>
+      <% } %>
+
+      <% if (pedido.status === 'fechado') { %>
+        <div class="painel no-imprimir" style="padding:16px 20px;">
+          <div class="painel-titulo" style="padding:0 0 10px;">🛵 Entregador</div>
+          <p class="texto-suave painel-subtitulo" style="padding:0 0 12px;">Dá pra trocar o entregador a qualquer momento, mesmo depois de já ter saído pra entrega ou já ter dado baixa — é só pra corrigir se atribuiu errado.</p>
+          <form method="POST" action="/pedidos/<%= pedido.id %>/atribuir-entregador" class="form-grade">
+            <div>
+              <label>Entregador responsável</label>
+              <select name="entregador_id">
+                <option value="">Sem entregador definido (aparece pra todos)</option>
+                <% entregadores.forEach(function(e) { %>
+                  <option value="<%= e.id %>" <%= pedido.entregador_id === e.id ? 'selected' : '' %>><%= e.nome %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="form-acoes">
+              <button class="botao botao-secundario" type="submit">Salvar entregador</button>
+            </div>
+          </form>
+        </div>
+      <% } %>
+
+      <% if (pedido.status === 'cancelado') { %>
+        <div class="painel no-imprimir" style="padding:16px 20px;">
+          <form method="POST" action="/pedidos/<%= pedido.id %>/excluir" class="excluir-os-form">
+            <button class="botao botao-secundario" type="submit">🗑️ Excluir essa O.S. permanentemente</button>
+          </form>
+        </div>
+      <% } %>
+
+      <% if (pedido.status === 'fechado' && pedido.entrega_status === 'entregue' && !pedido.baixado_em) { %>
+        <div class="painel no-imprimir" style="padding:16px 20px;">
+          <div class="painel-titulo" style="padding:0 0 10px;">✅ Dar baixa</div>
+          <p class="texto-suave painel-subtitulo" style="padding:0 0 12px;">Confira se o botijão/galão vazio voltou antes de dar baixa nessa O.S.</p>
+          <form method="POST" action="/pedidos/<%= pedido.id %>/dar-baixa" class="form-grade">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <input type="checkbox" name="vazio_retornou" id="vazio_retornou" value="1" style="width:auto;">
+              <label for="vazio_retornou" style="margin:0;">O vazio voltou</label>
+            </div>
+            <div class="form-acoes">
+              <button class="botao" type="submit">Confirmar baixa</button>
+            </div>
+          </form>
+        </div>
+      <% } %>
+
+      <% if (pedido.status === 'aberto') { %>
+        <div class="painel">
+          <div class="painel-titulo">Adicionar item ao carrinho</div>
+          <form method="POST" action="/pedidos/<%= pedido.id %>/itens" class="form-grade">
+            <div>
+              <label>Produto</label>
+              <select name="produto_id" required>
+                <optgroup label="Gás">
+                  <% produtos.filter(function(p){ return p.tipo === 'gas'; }).forEach(function(p) { %>
+                    <option value="<%= p.id %>"><%= p.nome %></option>
+                  <% }) %>
+                </optgroup>
+                <optgroup label="Água">
+                  <% produtos.filter(function(p){ return p.tipo === 'agua'; }).forEach(function(p) { %>
+                    <option value="<%= p.id %>"><%= p.nome %></option>
+                  <% }) %>
+                </optgroup>
+              </select>
+            </div>
+            <div>
+              <label>Tipo</label>
+              <select name="tipo_venda" required>
+                <option value="troca">Com troca (aguarda o vazio voltar)</option>
+                <option value="sem_troca">Sem troca (casco/vasilhame novo)</option>
+              </select>
+            </div>
+            <div>
+              <label>Quantidade</label>
+              <input type="number" name="quantidade" min="1" value="1" required>
+            </div>
+            <div class="form-acoes">
+              <button class="botao" type="submit">Encaminhar pro carrinho</button>
+            </div>
+          </form>
+        </div>
+      <% } %>
+
+      <div class="painel">
+        <div class="painel-titulo">Itens do carrinho (<%= itens.length %>)</div>
+        <% if (itens.length === 0) { %>
+          <div class="vazio-lista">Nenhum item adicionado ainda.</div>
+        <% } else { %>
+          <table>
+            <thead>
+              <tr>
+                <th>Produto</th>
+                <th>Tipo</th>
+                <th>Qtd.</th>
+                <th>Preço unit.</th>
+                <th>Subtotal</th>
+                <% if (pedido.status === 'fechado') { %><th>Vazio</th><% } %>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% itens.forEach(function(i) { %>
+                <tr>
+                  <td><%= i.produto_nome || (i.produto === 'agua' ? 'Água' : 'Gás') %></td>
+                  <td><%= i.tipo_venda === 'troca' ? 'Com troca' : 'Sem troca' %></td>
+                  <td><%= i.quantidade %></td>
+                  <td>R$ <%= Number(i.preco_unitario).toFixed(2) %></td>
+                  <td>R$ <%= (Number(i.preco_unitario) * i.quantidade).toFixed(2) %></td>
+                  <% if (pedido.status === 'fechado') { %>
+                    <td>
+                      <% if (i.tipo_venda === 'troca') { %>
+                        <% if (i.status_troca === 'aguardando_vazio') { %>
+                          <span class="selo selo-aguardando">Aguardando</span>
+                        <% } else { %>
+                          <span class="selo selo-concluida">Voltou</span>
+                        <% } %>
+                      <% } else { %>
+                        —
+                      <% } %>
+                    </td>
+                  <% } %>
+                  <td>
+                    <% if (pedido.status === 'aberto') { %>
+                      <form method="POST" action="/pedidos/<%= pedido.id %>/itens/<%= i.id %>/remover">
+                        <button class="botao botao-secundario botao-pequeno" type="submit">Remover</button>
+                      </form>
+                    <% } else if (i.tipo_venda === 'troca' && i.status_troca === 'aguardando_vazio') { %>
+                      <form method="POST" action="/pedidos/<%= pedido.id %>/itens/<%= i.id %>/confirmar-vazio">
+                        <button class="botao botao-pequeno" type="submit">Confirmar vazio</button>
+                      </form>
+                    <% } %>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        <% } %>
+      </div>
+
+      <div class="grade-cards">
+        <div class="card">
+          <div class="rotulo">Subtotal</div>
+          <div class="valor">R$ <%= Number(total).toFixed(2) %></div>
+        </div>
+        <div class="card">
+          <div class="rotulo">Desconto</div>
+          <div class="valor">R$ <%= Number(desconto).toFixed(2) %></div>
+        </div>
+        <div class="card destaque-verde">
+          <div class="rotulo">Total a pagar</div>
+          <div class="valor">R$ <%= Number(totalComDesconto).toFixed(2) %></div>
+        </div>
+      </div>
+
+      <div class="painel no-imprimir" style="padding:16px 20px;">
+        <div class="painel-titulo" style="padding:0 0 10px;">💸 Desconto</div>
+        <form method="POST" action="/pedidos/<%= pedido.id %>/desconto" class="form-grade">
+          <div>
+            <label>Valor do desconto (R$)</label>
+            <input type="number" step="0.01" min="0" name="desconto" value="<%= desconto %>">
+          </div>
+          <div class="form-acoes">
+            <button class="botao botao-secundario" type="submit">Aplicar desconto</button>
+          </div>
+        </form>
+      </div>
+
+      <% if (pedido.status === 'aberto') { %>
+        <div class="painel">
+          <div class="painel-titulo">Fechar pedido (gera a O.S. e manda pro entregador)</div>
+          <form method="POST" action="/pedidos/<%= pedido.id %>/fechar" class="form-grade">
+            <div>
+              <label>Forma de pagamento</label>
+              <select name="forma_pagamento" required>
+                <option value="dinheiro">Dinheiro</option>
+                <option value="pix">Pix</option>
+                <option value="cartao">Cartão</option>
+                <option value="fiado">Fiado</option>
+              </select>
+            </div>
+            <div>
+              <label>Endereço de entrega</label>
+              <input type="text" name="endereco_entrega" placeholder="<%= pedido.cliente_endereco || 'Deixe em branco pra usar o do cliente' %>" value="<%= pedido.cliente_endereco || '' %>">
+            </div>
+            <div>
+              <label>Observação</label>
+              <input type="text" name="observacao" placeholder="Ex: entregar até as 18h">
+            </div>
+            <div>
+              <label>Desconto (R$)</label>
+              <input type="number" step="0.01" min="0" name="desconto" value="<%= desconto %>">
+            </div>
+            <div>
+              <label>Entregador (opcional)</label>
+              <select name="entregador_id">
+                <option value="">Sem entregador definido (aparece pra todos)</option>
+                <% entregadores.forEach(function(e) { %>
+                  <option value="<%= e.id %>"><%= e.nome %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="form-acoes" style="display:flex; gap:10px;">
+              <button class="botao" type="submit" <%= itens.length === 0 ? 'disabled' : '' %>>Fechar pedido</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="painel" style="padding:16px 20px; display:flex; gap:10px;">
+          <form method="POST" action="/pedidos/<%= pedido.id %>/cancelar" class="cancelar-carrinho-form">
+            <input type="hidden" name="motivo">
+            <button class="botao botao-secundario botao-pequeno" type="submit">Cancelar carrinho</button>
+          </form>
+          <form method="POST" action="/pedidos/<%= pedido.id %>/excluir-carrinho" class="excluir-carrinho-form">
+            <button class="botao botao-perigo botao-pequeno" type="submit">Excluir carrinho</button>
+          </form>
+        </div>
+      <% } %>
+    </div>
+  </div>
+
+  <script>
+    document.querySelectorAll('.finalizar-form').forEach(function (form) {
+      form.addEventListener('submit', function (e) {
+        if (form.dataset.enviando) return;
+        if (!confirm('Confirmar que essa O.S. foi entregue?')) { e.preventDefault(); return; }
+        e.preventDefault();
+        form.dataset.enviando = '1';
+
+        let resolvido = false;
+        function enviar() { form.submit(); }
+
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(function (pos) {
+            if (resolvido) return;
+            resolvido = true;
+            form.querySelector('[name=latitude]').value = pos.coords.latitude;
+            form.querySelector('[name=longitude]').value = pos.coords.longitude;
+            enviar();
+          }, function () {
+            if (resolvido) return;
+            resolvido = true;
+            enviar();
+          }, { timeout: 4000 });
+          setTimeout(function () { if (!resolvido) { resolvido = true; enviar(); } }, 4500);
+        } else {
+          enviar();
+        }
+      });
+    });
+
+    document.querySelectorAll('.cancelar-os-form').forEach(function (form) {
+      form.addEventListener('submit', function (e) {
+        if (form.dataset.enviando) return;
+        if (!confirm('Cancelar essa O.S.? O estoque baixado no fechamento volta automaticamente.')) {
+          e.preventDefault();
+          return;
+        }
+        e.preventDefault();
+        var motivo = prompt('Motivo do cancelamento (opcional):', '');
+        form.querySelector('[name=motivo]').value = motivo || '';
+        form.dataset.enviando = '1';
+        form.submit();
+      });
+    });
+
+    document.querySelectorAll('.excluir-os-form').forEach(function (form) {
+      form.addEventListener('submit', function (e) {
+        if (form.dataset.enviando) return;
+        if (!confirm('Excluir essa O.S. de vez? Não tem como desfazer depois.')) {
+          e.preventDefault();
+          return;
+        }
+        form.dataset.enviando = '1';
+      });
+    });
+
+    document.querySelectorAll('.cancelar-carrinho-form').forEach(function (form) {
+      form.addEventListener('submit', function (e) {
+        if (form.dataset.enviando) return;
+        if (!confirm('Cancelar esse carrinho? Ele fica registrado em O.S. > Canceladas.')) {
+          e.preventDefault();
+          return;
+        }
+        e.preventDefault();
+        var motivo = prompt('Motivo do cancelamento (opcional):', '');
+        form.querySelector('[name=motivo]').value = motivo || '';
+        form.dataset.enviando = '1';
+        form.submit();
+      });
+    });
+
+    document.querySelectorAll('.excluir-carrinho-form').forEach(function (form) {
+      form.addEventListener('submit', function (e) {
+        if (form.dataset.enviando) return;
+        if (!confirm('Excluir esse carrinho de vez? Não tem como desfazer depois — se quiser manter um registro, use "Cancelar".')) {
+          e.preventDefault();
+          return;
+        }
+        form.dataset.enviando = '1';
+      });
+    });
+  </script>
+</body>
+</html>

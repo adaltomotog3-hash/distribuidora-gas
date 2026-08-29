@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <%- include('partials/head', { titulo: 'Estoque' }) %>
+</head>
+<body>
+  <div class="app">
+    <%- include('partials/sidebar', { paginaAtual: 'estoque' }) %>
+
+    <div class="conteudo">
+
+      <%- include('partials/flash') %>
+      <div class="topo-pagina">
+        <div>
+          <h1>Estoque</h1>
+          <p>Lista de produtos com a quantidade em cheios/vazios — clique em "Gerenciar" pra corrigir, renomear ou registrar entrada/saída</p>
+        </div>
+      </div>
+
+      <div class="painel">
+        <div class="painel-titulo">🔥 Gás</div>
+        <% if (produtosGas.length === 0) { %>
+          <div class="vazio-lista">Nenhum produto de gás cadastrado ainda.</div>
+        <% } else { %>
+          <div class="grade-produtos-estoque">
+            <% produtosGas.forEach(function(produto) { %>
+              <%- include('partials/produto-estoque', { produto: produto }) %>
+            <% }) %>
+          </div>
+        <% } %>
+      </div>
+
+      <div class="painel">
+        <div class="painel-titulo">💧 Água</div>
+        <% if (produtosAgua.length === 0) { %>
+          <div class="vazio-lista">Nenhum produto de água cadastrado ainda.</div>
+        <% } else { %>
+          <div class="grade-produtos-estoque">
+            <% produtosAgua.forEach(function(produto) { %>
+              <%- include('partials/produto-estoque', { produto: produto }) %>
+            <% }) %>
+          </div>
+        <% } %>
+      </div>
+
+      <div class="painel">
+        <div class="painel-titulo">➕ Cadastrar novo produto (tipo/tamanho)</div>
+        <p class="texto-suave painel-subtitulo">Ex: "P20", "P45", "Galão 10L", "Copo 300ml"</p>
+        <form method="POST" action="/estoque/produtos" class="form-grade">
+          <div>
+            <label>Categoria</label>
+            <select name="tipo" required>
+              <option value="gas">Gás</option>
+              <option value="agua">Água</option>
+            </select>
+          </div>
+          <div>
+            <label>Nome do produto</label>
+            <input type="text" name="nome" placeholder="Ex: Copo 300ml" required>
+          </div>
+          <div>
+            <label>Estoque inicial — cheios</label>
+            <input type="number" min="0" name="qtd_cheios" value="0">
+          </div>
+          <div>
+            <label>Estoque inicial — vazios</label>
+            <input type="number" min="0" name="qtd_vazios" value="0">
+          </div>
+          <div class="form-acoes">
+            <button class="botao" type="submit">Cadastrar produto</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="painel">
+        <div class="painel-titulo">Últimas movimentações</div>
+        <% if (movimentos.length === 0) { %>
+          <div class="vazio-lista">Nenhuma movimentação registrada ainda.</div>
+        <% } else { %>
+          <table>
+            <thead>
+              <tr><th>Produto</th><th>Tipo</th><th>Quantidade</th><th>Observação</th><th>Data</th></tr>
+            </thead>
+            <tbody>
+              <% movimentos.forEach(function(m) { %>
+                <tr>
+                  <td><%= m.produto_nome ? m.produto_nome + (m.produto_tipo === 'agua' ? ' (Água)' : ' (Gás)') : '—' %></td>
+                  <td><%= nomesMovimento[m.tipo] || m.tipo %></td>
+                  <td><%= m.quantidade %></td>
+                  <td class="texto-suave"><%= m.observacao || '—' %></td>
+                  <td class="texto-suave"><%= new Date(m.criado_em).toLocaleString('pt-BR') %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Mostra/esconde a linha de ações (corrigir, renomear, entrada/saída) de cada produto
+    document.querySelectorAll('[data-abrir-detalhe]').forEach(function (botao) {
+      botao.addEventListener('click', function () {
+        const alvo = document.getElementById('detalhe-' + botao.dataset.abrirDetalhe);
+        if (alvo) alvo.style.display = alvo.style.display === 'none' ? 'block' : 'none';
+      });
+    });
+  </script>
+</body>
+</html>

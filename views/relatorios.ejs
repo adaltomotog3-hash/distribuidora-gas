@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <%- include('partials/head', { titulo: 'Relatórios' }) %>
+  <style>
+    .abas-relatorio { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+    .aba-relatorio {
+      padding: 9px 16px; border-radius: 8px; font-size: 13.5px; font-weight: 600;
+      border: 1px solid var(--borda); color: var(--texto-suave); background: var(--papel);
+      box-shadow: var(--sombra-suave); transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .aba-relatorio:hover { border-color: #C9C6BE; color: var(--texto); }
+    .aba-relatorio.ativa { background: var(--chama); color: #fff; border-color: var(--chama); box-shadow: 0 4px 12px rgba(217,96,28,0.28); }
+    .aba-relatorio.ativa:hover { color: #fff; }
+    .aba-relatorio.ativa.secundaria { background: var(--azul-noite); border-color: var(--azul-noite); box-shadow: 0 4px 12px rgba(27,36,48,0.25); }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <%- include('partials/sidebar', { paginaAtual: 'relatorios' }) %>
+
+    <div class="conteudo">
+
+      <%- include('partials/flash') %>
+      <div class="topo-pagina">
+        <div>
+          <h1>Relatórios</h1>
+          <p>Acompanhe as vendas e o financeiro por período — diário, semanal, quinzenal, mensal ou anual</p>
+        </div>
+      </div>
+
+      <div class="abas-relatorio">
+        <a class="aba-relatorio <%= tipo === 'vendas' ? 'ativa' : '' %>" href="/relatorios?tipo=vendas&periodo=<%= periodo %>">📦 Relatório de Vendas</a>
+        <a class="aba-relatorio <%= tipo === 'financeiro' ? 'ativa' : '' %>" href="/relatorios?tipo=financeiro&periodo=<%= periodo %>">💰 Relatório Financeiro</a>
+        <a class="aba-relatorio <%= tipo === 'entregas' ? 'ativa' : '' %>" href="/relatorios?tipo=entregas">🛵 Relatório de Entregas</a>
+      </div>
+
+      <% if (tipo !== 'entregas') { %>
+        <div class="abas-relatorio">
+          <a class="aba-relatorio secundaria <%= periodo === 'dia' ? 'ativa' : '' %>" href="/relatorios?tipo=<%= tipo %>&periodo=dia">Diário</a>
+          <a class="aba-relatorio secundaria <%= periodo === 'semana' ? 'ativa' : '' %>" href="/relatorios?tipo=<%= tipo %>&periodo=semana">Semanal</a>
+          <a class="aba-relatorio secundaria <%= periodo === 'quinzena' ? 'ativa' : '' %>" href="/relatorios?tipo=<%= tipo %>&periodo=quinzena">Quinzenal</a>
+          <a class="aba-relatorio secundaria <%= periodo === 'mes' ? 'ativa' : '' %>" href="/relatorios?tipo=<%= tipo %>&periodo=mes">Mensal</a>
+          <a class="aba-relatorio secundaria <%= periodo === 'ano' ? 'ativa' : '' %>" href="/relatorios?tipo=<%= tipo %>&periodo=ano">Anual</a>
+        </div>
+
+        <% if (linhas.length > 0) { %>
+          <%
+            var somaPedidos = linhas.reduce(function(s, l) { return s + l.total_pedidos; }, 0);
+            var somaItens = linhas.reduce(function(s, l) { return s + (l.total_itens || 0); }, 0);
+            var somaGas = linhas.reduce(function(s, l) { return s + (l.qtd_gas || 0); }, 0);
+            var somaAgua = linhas.reduce(function(s, l) { return s + (l.qtd_agua || 0); }, 0);
+            var somaValor = linhas.reduce(function(s, l) { return s + Number(l.valor_total || 0); }, 0);
+            var somaDescontos = linhas.reduce(function(s, l) { return s + Number(l.total_descontos || 0); }, 0);
+          %>
+          <p class="texto-suave" style="font-size:12.5px; margin: -4px 0 10px;">Somando todos os períodos listados abaixo:</p>
+          <div class="grade-cards">
+            <div class="card">
+              <div class="rotulo">Pedidos (O.S.)</div>
+              <div class="valor"><%= somaPedidos %></div>
+            </div>
+            <% if (tipo === 'vendas') { %>
+              <div class="card">
+                <div class="rotulo">Itens vendidos</div>
+                <div class="valor"><%= somaItens %></div>
+              </div>
+              <div class="card destaque-chama">
+                <div class="rotulo">🔥 Qtd. Gás</div>
+                <div class="valor"><%= somaGas %></div>
+              </div>
+              <div class="card">
+                <div class="rotulo">💧 Qtd. Água</div>
+                <div class="valor"><%= somaAgua %></div>
+              </div>
+            <% } else { %>
+              <div class="card destaque-verde">
+                <div class="rotulo">Valor total (já com desconto)</div>
+                <div class="valor">R$ <%= somaValor.toFixed(2) %></div>
+              </div>
+              <div class="card">
+                <div class="rotulo">Descontos concedidos</div>
+                <div class="valor">R$ <%= somaDescontos.toFixed(2) %></div>
+              </div>
+            <% } %>
+          </div>
+        <% } %>
+
+        <div class="painel">
+          <div class="painel-titulo">
+            <%= tipo === 'vendas' ? 'Vendas por período' : 'Financeiro por período' %>
+          </div>
+          <% if (linhas.length === 0) { %>
+            <div class="vazio-lista">Ainda não há pedidos fechados suficientes pra montar esse relatório.</div>
+          <% } else { %>
+            <table>
+              <thead>
+                <% if (tipo === 'vendas') { %>
+                  <tr>
+                    <th>Período</th>
+                    <th>Pedidos (O.S.)</th>
+                    <th>Itens vendidos</th>
+                    <th>Qtd. Gás</th>
+                    <th>Qtd. Água</th>
+                  </tr>
+                <% } else { %>
+                  <tr>
+                    <th>Período</th>
+                    <th>Pedidos (O.S.)</th>
+                    <th>Valor Gás</th>
+                    <th>Valor Água</th>
+                    <th>Descontos</th>
+                    <th>Valor Total</th>
+                  </tr>
+                <% } %>
+              </thead>
+              <tbody>
+                <% linhas.forEach(function(l) { %>
+                  <tr>
+                    <td style="text-transform:capitalize;"><%= l.label %></td>
+                    <td><%= l.total_pedidos %></td>
+                    <% if (tipo === 'vendas') { %>
+                      <td><%= l.total_itens %></td>
+                      <td><%= l.qtd_gas %></td>
+                      <td><%= l.qtd_agua %></td>
+                    <% } else { %>
+                      <td>R$ <%= Number(l.valor_gas).toFixed(2) %></td>
+                      <td>R$ <%= Number(l.valor_agua).toFixed(2) %></td>
+                      <td class="texto-suave">R$ <%= Number(l.total_descontos).toFixed(2) %></td>
+                      <td><strong>R$ <%= Number(l.valor_total).toFixed(2) %></strong></td>
+                    <% } %>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          <% } %>
+        </div>
+
+        <p class="texto-suave" style="font-size:12.5px;">
+          Esse relatório mostra os últimos períodos que já tiveram pedido fechado (por exemplo, os últimos 30 dias no diário, ou os últimos 12 meses no mensal).
+          Pra ver um intervalo de datas específico com mais detalhe (forma de pagamento, tipo de item), use a página <a href="/financeiro">Financeiro</a>.
+        </p>
+      <% } else { %>
+        <div class="painel">
+          <form method="GET" action="/relatorios" class="form-grade">
+            <input type="hidden" name="tipo" value="entregas">
+            <div>
+              <label>De</label>
+              <input type="date" name="inicio" value="<%= inicio %>">
+            </div>
+            <div>
+              <label>Até</label>
+              <input type="date" name="fim" value="<%= fim %>">
+            </div>
+            <div class="form-acoes">
+              <button class="botao" type="submit">Filtrar período</button>
+            </div>
+          </form>
+        </div>
+
+        <% if (porEntregador.length > 0) { %>
+          <%
+            var somaEntregas = porEntregador.reduce(function(s, e) { return s + e.total_entregas; }, 0);
+            var somaValorEntregas = porEntregador.reduce(function(s, e) { return s + Number(e.valor_total); }, 0);
+          %>
+          <div class="grade-cards">
+            <div class="card">
+              <div class="rotulo">Entregas no período</div>
+              <div class="valor"><%= somaEntregas %></div>
+            </div>
+            <div class="card destaque-verde">
+              <div class="rotulo">Valor entregue</div>
+              <div class="valor">R$ <%= somaValorEntregas.toFixed(2) %></div>
+            </div>
+          </div>
+        <% } %>
+
+        <div class="painel">
+          <div class="painel-titulo">Quem entregou — por entregador</div>
+          <% if (porEntregador.length === 0) { %>
+            <div class="vazio-lista">Nenhuma entrega finalizada nesse período.</div>
+          <% } else { %>
+            <table>
+              <thead><tr><th>Entregador</th><th>Entregas</th><th>Valor entregue</th></tr></thead>
+              <tbody>
+                <% porEntregador.forEach(function(e) { %>
+                  <tr>
+                    <td><%= e.entregador_nome %></td>
+                    <td><%= e.total_entregas %></td>
+                    <td>R$ <%= Number(e.valor_total).toFixed(2) %></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          <% } %>
+        </div>
+
+        <div class="painel">
+          <div class="painel-titulo">Detalhe das entregas (<%= detalhe.length %>)</div>
+          <% if (detalhe.length === 0) { %>
+            <div class="vazio-lista">Nenhuma entrega finalizada nesse período.</div>
+          <% } else { %>
+            <div class="painel-tabela-rolagem">
+            <table>
+              <thead>
+                <tr>
+                  <th>O.S.</th>
+                  <th>Cliente</th>
+                  <th>Itens</th>
+                  <th>Total</th>
+                  <th>Entregador</th>
+                  <th>Entregue em</th>
+                  <th>Baixa</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% detalhe.forEach(function(d) { %>
+                  <tr>
+                    <td><a href="/pedidos/<%= d.id %>"><span class="selo-os">Nº <%= d.id %></span></a></td>
+                    <td><%= d.cliente_nome %></td>
+                    <td class="texto-suave"><%= d.resumo_itens || '—' %></td>
+                    <td>R$ <%= Number(d.total_valor).toFixed(2) %></td>
+                    <td><%= d.entregador_nome %></td>
+                    <td class="texto-suave"><%= d.entregue_em ? new Date(d.entregue_em).toLocaleString('pt-BR') : '—' %></td>
+                    <td>
+                      <% if (d.baixado_em) { %>
+                        <span class="selo selo-concluida">Baixada</span>
+                      <% } else { %>
+                        <span class="selo selo-aguardando">Pendente</span>
+                      <% } %>
+                    </td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+            </div>
+          <% } %>
+        </div>
+      <% } %>
+    </div>
+  </div>
+</body>
+</html>

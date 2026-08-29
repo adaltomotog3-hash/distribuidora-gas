@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <%- include('partials/head', { titulo: 'O.S.' }) %>
+</head>
+<body>
+  <div class="app">
+    <%- include('partials/sidebar', { paginaAtual: 'os' }) %>
+
+    <div class="conteudo">
+
+      <%- include('partials/flash') %>
+      <div class="topo-pagina">
+        <div>
+          <h1>O.S.</h1>
+          <p>Acompanhamento das entregas — o que está pendente, aguardando baixa, baixado e cancelado</p>
+        </div>
+        <span>
+          <a class="<%= !produtoFiltro ? 'botao botao-pequeno' : 'botao botao-secundario botao-pequeno' %>" href="/os">Todos</a>
+          <a class="<%= produtoFiltro === 'gas' ? 'botao botao-pequeno' : 'botao botao-secundario botao-pequeno' %>" href="/os?produto=gas">Gás</a>
+          <a class="<%= produtoFiltro === 'agua' ? 'botao botao-pequeno' : 'botao botao-secundario botao-pequeno' %>" href="/os?produto=agua">Água</a>
+        </span>
+      </div>
+
+      <div class="grade-cards">
+        <div class="card">
+          <div class="rotulo">O.S. em aberto</div>
+          <div class="valor"><%= abertas.length %></div>
+        </div>
+        <div class="card">
+          <div class="rotulo">Aguardando baixa</div>
+          <div class="valor"><%= aguardandoBaixa.length %></div>
+        </div>
+        <div class="card destaque-verde">
+          <div class="rotulo">Baixadas (últimas 200)</div>
+          <div class="valor"><%= baixadas.length %></div>
+        </div>
+        <div class="card">
+          <div class="rotulo">Canceladas (últimas 100)</div>
+          <div class="valor"><%= canceladas.length %></div>
+        </div>
+      </div>
+
+      <div class="painel">
+        <div class="painel-titulo">O.S. em aberto — aguardando entrega (<%= abertas.length %>)</div>
+        <% if (abertas.length === 0) { %>
+          <div class="vazio-lista">Nenhuma O.S. em aberto no momento. Tudo entregue!</div>
+        <% } else { %>
+          <div class="painel-tabela-rolagem">
+          <table>
+            <thead>
+              <tr>
+                <th>O.S.</th>
+                <th>Cliente</th>
+                <th>Itens</th>
+                <th>Total</th>
+                <th>Endereço</th>
+                <th>Gerada em</th>
+                <th>Entregador</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% abertas.forEach(function(p) { %>
+                <tr>
+                  <td><a href="/pedidos/<%= p.id %>"><span class="selo-os">Nº <%= p.id %></span></a></td>
+                  <td>
+                    <%= nomeDoPedido(p) %>
+                    <% if (p.cliente_telefone) { %>
+                      <br><span class="texto-suave" style="font-size:12px;">📞 <%= p.cliente_telefone %></span>
+                    <% } %>
+                  </td>
+                  <td class="texto-suave"><%= p.resumo_itens || '—' %></td>
+                  <td>R$ <%= Number(p.total_valor).toFixed(2) %></td>
+                  <td class="texto-suave">
+                    <%= p.endereco_final || '—' %>
+                    <% if (p.cliente_latitude && p.cliente_longitude) { %>
+                      · <a target="_blank" href="https://www.google.com/maps?q=<%= p.cliente_latitude %>,<%= p.cliente_longitude %>">mapa</a>
+                    <% } %>
+                  </td>
+                  <td class="texto-suave"><%= p.fechado_em ? new Date(p.fechado_em).toLocaleString('pt-BR') : '—' %></td>
+                  <td>
+                    <form method="POST" action="/pedidos/<%= p.id %>/atribuir-entregador" class="form-entregador-inline">
+                      <select name="entregador_id">
+                        <option value="">Todos os entregadores</option>
+                        <% entregadores.forEach(function(e) { %>
+                          <option value="<%= e.id %>" <%= p.entregador_id === e.id ? 'selected' : '' %>><%= e.nome %></option>
+                        <% }) %>
+                      </select>
+                      <button type="submit" class="botao botao-secundario botao-pequeno">Salvar</button>
+                    </form>
+                  </td>
+                  <td style="white-space:nowrap;">
+                    <form method="POST" action="/pedidos/<%= p.id %>/finalizar" class="finalizar-form" style="display:inline-block;">
+                      <input type="hidden" name="latitude">
+                      <input type="hidden" name="longitude">
+                      <button type="submit" class="botao botao-pequeno">Finalizar</button>
+                    </form>
+                    <form method="POST" action="/pedidos/<%= p.id %>/cancelar-os" class="cancelar-os-form" style="display:inline-block;">
+                      <input type="hidden" name="motivo">
+                      <button type="submit" class="botao botao-secundario botao-pequeno">Cancelar</button>
+                    </form>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+          </div>
+        <% } %>
+      </div>
+
+      <div class="painel">
+        <div class="painel-titulo">Finalizadas — aguardando baixa da loja (<%= aguardandoBaixa.length %>)</div>
+        <p class="texto-suave" style="padding:0 20px; margin: -6px 0 0;">O entregador já finalizou em campo. Confira se o vazio voltou e dê baixa pra encerrar a O.S.</p>
+        <% if (aguardandoBaixa.length === 0) { %>
+          <div class="vazio-lista">Nenhuma O.S. aguardando baixa no momento.</div>
+        <% } else { %>
+          <div class="painel-tabela-rolagem">
+          <table>
+            <thead>
+              <tr>
+                <th>O.S.</th>
+                <th>Cliente</th>
+                <th>Itens</th>
+                <th>Total</th>
+                <th>Entregador</th>
+                <th>Entregue em</th>
+                <th>Vazio</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% aguardandoBaixa.forEach(function(p) { %>
+                <tr>
+                  <td><a href="/pedidos/<%= p.id %>"><span class="selo-os">Nº <%= p.id %></span></a></td>
+                  <td><%= nomeDoPedido(p) %></td>
+                  <td class="texto-suave"><%= p.resumo_itens || '—' %></td>
+                  <td>R$ <%= Number(p.total_valor).toFixed(2) %></td>
+                  <td>
+                    <form method="POST" action="/pedidos/<%= p.id %>/atribuir-entregador" class="form-entregador-inline">
+                      <select name="entregador_id">
+                        <option value="">Escritório</option>
+                        <% entregadores.forEach(function(e) { %>
+                          <option value="<%= e.id %>" <%= p.entregador_id === e.id ? 'selected' : '' %>><%= e.nome %></option>
+                        <% }) %>
+                      </select>
+                      <button type="submit" class="botao botao-secundario botao-pequeno">Salvar</button>
+                    </form>
+                  </td>
+                  <td class="texto-suave"><%= p.entregue_em ? new Date(p.entregue_em).toLocaleString('pt-BR') : '—' %></td>
+                  <td>
+                    <% if (p.itens_aguardando_vazio > 0) { %>
+                      <span class="selo selo-aguardando">Não voltou</span>
+                    <% } else { %>
+                      <span class="selo selo-concluida">OK</span>
+                    <% } %>
+                  </td>
+                  <td>
+                    <form method="POST" action="/pedidos/<%= p.id %>/dar-baixa" class="dar-baixa-form-inline">
+                      <label style="display:flex; align-items:center; gap:5px; font-weight:500; font-size:12.5px; color:var(--texto-suave); margin-bottom:6px;">
+                        <input type="checkbox" name="vazio_retornou" value="1" style="width:auto;"> Vazio voltou
+                      </label>
+                      <button type="submit" class="botao botao-pequeno">Dar baixa</button>
+                    </form>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+          </div>
+        <% } %>
+      </div>
+
+      <div class="painel">
+        <div class="painel-titulo">Baixadas — histórico de entregas conferidas (<%= baixadas.length %>)</div>
+        <% if (baixadas.length === 0) { %>
+          <div class="vazio-lista">Nenhuma O.S. baixada ainda.</div>
+        <% } else { %>
+          <div class="painel-tabela-rolagem">
+          <table>
+            <thead>
+              <tr>
+                <th>O.S.</th>
+                <th>Cliente</th>
+                <th>Itens</th>
+                <th>Total</th>
+                <th>Entregador</th>
+                <th>Entregue em</th>
+                <th>Baixa dada por</th>
+                <th>Local</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% baixadas.forEach(function(p) { %>
+                <tr>
+                  <td><a href="/pedidos/<%= p.id %>"><span class="selo-os">Nº <%= p.id %></span></a></td>
+                  <td><%= nomeDoPedido(p) %></td>
+                  <td class="texto-suave"><%= p.resumo_itens || '—' %></td>
+                  <td>R$ <%= Number(p.total_valor).toFixed(2) %></td>
+                  <td>
+                    <form method="POST" action="/pedidos/<%= p.id %>/atribuir-entregador" class="form-entregador-inline">
+                      <select name="entregador_id">
+                        <option value="">Escritório</option>
+                        <% entregadores.forEach(function(e) { %>
+                          <option value="<%= e.id %>" <%= p.entregador_id === e.id ? 'selected' : '' %>><%= e.nome %></option>
+                        <% }) %>
+                      </select>
+                      <button type="submit" class="botao botao-secundario botao-pequeno">Salvar</button>
+                    </form>
+                  </td>
+                  <td class="texto-suave"><%= p.entregue_em ? new Date(p.entregue_em).toLocaleString('pt-BR') : '—' %></td>
+                  <td class="texto-suave"><%= p.baixado_por || '—' %> <br><span style="font-size:11.5px;"><%= p.baixado_em ? new Date(p.baixado_em).toLocaleString('pt-BR') : '' %></span></td>
+                  <td>
+                    <% if (p.entrega_lat && p.entrega_lng) { %>
+                      <a target="_blank" href="https://www.google.com/maps?q=<%= p.entrega_lat %>,<%= p.entrega_lng %>">ver no mapa</a>
+                    <% } else { %>
+                      —
+                    <% } %>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+          </div>
+        <% } %>
+      </div>
+
+      <div class="painel">
+        <div class="painel-titulo">Canceladas (<%= canceladas.length %>)</div>
+        <% if (canceladas.length === 0) { %>
+          <div class="vazio-lista">Nenhuma O.S. cancelada.</div>
+        <% } else { %>
+          <div class="painel-tabela-rolagem">
+          <table>
+            <thead>
+              <tr>
+                <th>O.S.</th>
+                <th>Cliente</th>
+                <th>Itens</th>
+                <th>Total</th>
+                <th>Cancelada em</th>
+                <th>Motivo</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% canceladas.forEach(function(p) { %>
+                <tr>
+                  <td><a href="/pedidos/<%= p.id %>"><span class="selo-os">Nº <%= p.id %></span></a></td>
+                  <td><%= nomeDoPedido(p) %></td>
+                  <td class="texto-suave"><%= p.resumo_itens || '—' %></td>
+                  <td>R$ <%= Number(p.total_valor).toFixed(2) %></td>
+                  <td class="texto-suave"><%= p.cancelado_em ? new Date(p.cancelado_em).toLocaleString('pt-BR') : '—' %></td>
+                  <td class="texto-suave"><%= p.motivo_cancelamento || '—' %></td>
+                  <td>
+                    <form method="POST" action="/pedidos/<%= p.id %>/excluir" class="excluir-os-form">
+                      <button type="submit" class="botao botao-perigo botao-pequeno">🗑️ Excluir</button>
+                    </form>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+          </div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.querySelectorAll('.finalizar-form').forEach(function (form) {
+      form.addEventListener('submit', function (e) {
+        if (form.dataset.enviando) return;
+        if (!confirm('Confirmar que essa O.S. foi entregue?')) { e.preventDefault(); return; }
+        e.preventDefault();
+        form.dataset.enviando = '1';
+
+        let resolvido = false;
+        function enviar() { form.submit(); }
+
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(function (pos) {
+            if (resolvido) return;
+            resolvido = true;
+            form.querySelector('[name=latitude]').value = pos.coords.latitude;
+            form.querySelector('[name=longitude]').value = pos.coords.longitude;
+            enviar();
+          }, function () {
+            if (resolvido) return;
+            resolvido = true;
+            enviar();
+          }, { timeout: 4000 });
+          setTimeout(function () { if (!resolvido) { resolvido = true; enviar(); } }, 4500);
+        } else {
+          enviar();
+        }
+      });
+    });
+
+    document.querySelectorAll('.cancelar-os-form').forEach(function (form) {
+      form.addEventListener('submit', function (e) {
+        if (form.dataset.enviando) return;
+        if (!confirm('Cancelar essa O.S.? O estoque baixado no fechamento volta automaticamente.')) {
+          e.preventDefault();
+          return;
+        }
+        e.preventDefault();
+        var motivo = prompt('Motivo do cancelamento (opcional):', '');
+        form.querySelector('[name=motivo]').value = motivo || '';
+        form.dataset.enviando = '1';
+        form.submit();
+      });
+    });
+
+    document.querySelectorAll('.dar-baixa-form-inline').forEach(function (form) {
+      form.addEventListener('submit', function (e) {
+        if (form.dataset.enviando) return;
+        if (!confirm('Confirmar baixa dessa O.S.?')) { e.preventDefault(); return; }
+        form.dataset.enviando = '1';
+      });
+    });
+
+    document.querySelectorAll('.excluir-os-form').forEach(function (form) {
+      form.addEventListener('submit', function (e) {
+        if (form.dataset.enviando) return;
+        if (!confirm('Excluir essa O.S. de vez? Não tem como desfazer depois.')) {
+          e.preventDefault();
+          return;
+        }
+        form.dataset.enviando = '1';
+      });
+    });
+  </script>
+</body>
+</html>

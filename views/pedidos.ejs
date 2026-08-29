@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <%- include('partials/head', { titulo: 'Pedidos' }) %>
+</head>
+<body>
+  <div class="app">
+    <%- include('partials/sidebar', { paginaAtual: 'pedidos' }) %>
+
+    <div class="conteudo">
+
+      <%- include('partials/flash') %>
+      <div class="topo-pagina">
+        <div>
+          <h1>Pedidos</h1>
+          <p>Monte o carrinho enquanto o cliente vai pedindo, depois feche pra gerar a O.S.</p>
+        </div>
+      </div>
+
+      <div class="painel">
+        <div class="painel-titulo">Novo pedido (abrir carrinho)</div>
+        <form method="POST" action="/pedidos" class="form-grade">
+          <div>
+            <label>Cliente cadastrado</label>
+            <select name="cliente_id">
+              <option value="">Não é cliente cadastrado</option>
+              <% clientes.forEach(function(c) { %>
+                <option value="<%= c.id %>"><%= c.nome %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div>
+            <label>Ou nome pra identificar o carrinho</label>
+            <input type="text" name="nome_avulso" placeholder="Ex: Seu João da esquina">
+          </div>
+          <div class="form-acoes">
+            <button class="botao" type="submit">Abrir carrinho</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="painel">
+        <div class="painel-titulo">
+          <span>Carrinhos em aberto (<%= abertos.length %>)</span>
+          <a class="botao botao-secundario botao-pequeno" href="/os">Ver O.S. (histórico de entregas) ›</a>
+        </div>
+        <% if (abertos.length === 0) { %>
+          <div class="vazio-lista">Nenhum carrinho em aberto no momento.</div>
+        <% } else { %>
+          <table>
+            <thead>
+              <tr><th>Cliente</th><th>Itens</th><th>Total</th><th>Aberto em</th><th></th></tr>
+            </thead>
+            <tbody>
+              <% abertos.forEach(function(p) { %>
+                <tr>
+                  <td><%= nomeDoPedido(p) %></td>
+                  <td><%= p.total_itens %></td>
+                  <td>R$ <%= Number(p.total_valor).toFixed(2) %></td>
+                  <td class="texto-suave"><%= new Date(p.criado_em).toLocaleString('pt-BR') %></td>
+                  <td style="white-space:nowrap;">
+                    <a class="botao botao-pequeno" href="/pedidos/<%= p.id %>">Continuar carrinho</a>
+                    <form method="POST" action="/pedidos/<%= p.id %>/cancelar" class="cancelar-carrinho-form" style="display:inline-block;">
+                      <input type="hidden" name="motivo">
+                      <button class="botao botao-secundario botao-pequeno" type="submit">Cancelar</button>
+                    </form>
+                    <form method="POST" action="/pedidos/<%= p.id %>/excluir-carrinho" class="excluir-carrinho-form" style="display:inline-block;">
+                      <button class="botao botao-perigo botao-pequeno" type="submit">Excluir</button>
+                    </form>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.querySelectorAll('.cancelar-carrinho-form').forEach(function (form) {
+      form.addEventListener('submit', function (e) {
+        if (form.dataset.enviando) return;
+        if (!confirm('Cancelar esse carrinho? Ele sai da lista de abertos e fica registrado em O.S. > Canceladas.')) {
+          e.preventDefault();
+          return;
+        }
+        e.preventDefault();
+        var motivo = prompt('Motivo do cancelamento (opcional):', '');
+        form.querySelector('[name=motivo]').value = motivo || '';
+        form.dataset.enviando = '1';
+        form.submit();
+      });
+    });
+
+    document.querySelectorAll('.excluir-carrinho-form').forEach(function (form) {
+      form.addEventListener('submit', function (e) {
+        if (form.dataset.enviando) return;
+        if (!confirm('Excluir esse carrinho de vez? Não tem como desfazer depois — se quiser manter um registro, use "Cancelar".')) {
+          e.preventDefault();
+          return;
+        }
+        form.dataset.enviando = '1';
+      });
+    });
+  </script>
+</body>
+</html>

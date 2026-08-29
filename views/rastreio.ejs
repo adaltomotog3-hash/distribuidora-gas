@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <%- include('partials/head', { titulo: 'Rastreio' }) %>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    #mapa { width: 100%; height: 560px; border-radius: var(--raio); border: 1px solid var(--borda); }
+    .legenda { display: flex; gap: 18px; margin-bottom: 14px; font-size: 13px; color: var(--texto-suave); flex-wrap: wrap; }
+    .legenda span { display: inline-flex; align-items: center; gap: 6px; }
+    .ponto { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <%- include('partials/sidebar', { paginaAtual: 'rastreio' }) %>
+
+    <div class="conteudo">
+
+      <%- include('partials/flash') %>
+      <div class="topo-pagina">
+        <div>
+          <h1>Rastreio</h1>
+          <p>Localização do entregador em tempo real e entregas finalizadas hoje</p>
+        </div>
+      </div>
+
+      <div class="painel" style="padding:20px;">
+        <div class="legenda">
+          <span><span class="ponto" style="background:#F4772E"></span> Entregador (posição atual)</span>
+          <span><span class="ponto" style="background:#2E9E5B"></span> Entrega de gás finalizada</span>
+          <span><span class="ponto" style="background:#2B7DE9"></span> Entrega de água finalizada</span>
+          <span><span class="ponto" style="background:#8A5CF6"></span> Pedido com gás + água finalizado</span>
+        </div>
+        <div id="mapa"></div>
+        <div id="status-atualizacao" class="texto-suave" style="margin-top:10px; font-size:12.5px;">Carregando...</div>
+      </div>
+
+      <div class="painel">
+        <div class="painel-titulo">Entregas finalizadas hoje</div>
+        <div id="lista-entregas-hoje">
+          <div class="vazio-lista">Carregando...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const mapa = L.map('mapa').setView([-14.235, -51.925], 4); // centro do Brasil, até ter posição real
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap',
+      maxZoom: 19
+    }).addTo(mapa);
+
+    const marcadoresEntregador = {};
+    const marcadoresEntrega = [];
+    let ajustouZoomInicial = false;
+
+    function corDoProduto(produto) {
+      if (produto === 'agua') return '#2B7DE9';
+      if (produto === 'misto') return '#8A5CF6';
+      return '#2E9E5B';
+    }
+
+    function rotuloDoProduto(produto) {
+      if (produto === 'agua') return 'Água';
+      if (produto === 'misto') return 'Gás + Água';
+      return 'Gás';
+    }
+
+    function iconeEntregador() {
+      return L.divIcon({
+        className: '',
+        html: '<div style="width:16px;height:16px;border-radius:50%;background:#F4772E;border:3px solid #fff;box-shadow:0 0 0 2px #F4772E;"></div>',
+        iconSize: [16, 16],
+        iconAnchor: [8, 8]
+      });
+    }
+
+    async function atualizar() {
+      try {
+        const resp = await fetch('/rastreio/dados');
+        const dados = await resp.json();
+        const pontos = [];
+
+        // Posição atual de cada entregador
+        dados.entregadores.forEach((e) => {
+          if (!e.ultima_lat || !e.ultima_lng) return;
+          const posicao = [Number(e.ultima_lat), Number(e.ultima_lng)];
+          pontos.push(posicao);
+
+          if (marcadoresEntregador[e.id]) {
+            marcadoresEntregador[e.id].setLatLng(posicao);
+          } else {
+            marcadoresEntregador[e.id] = L.marker(posicao, { icon: iconeEntregador() }).addTo(mapa);
+          }
+          const quando = e.ultima_localizacao_em ? new Date(e.ultima_localizacao_em).toLocaleString('pt-BR') : '';
+          marcadoresEntregador[e.id].bindPopup(`<b>${e.nome}</b><br>Última posição: ${quando}`);
+        });
+
+        // Limpa marcadores antigos de entrega e desenha os de hoje
+        marcadoresEntrega.forEach((m) => mapa.removeLayer(m));
+        marcadoresEntrega.length = 0;
+
+        dados.entregasHoje.forEach((v) => {
+          const posicao = [Number(v.entrega_lat), Number(v.entrega_lng)];
+          pontos.push(posicao);
+          const marcador = L.circleMarker(posicao, {
+            radius: 7,
+            color: corDoProduto(v.produto),
+            fillColor: corDoProduto(v.produto),
+            fillOpacity: 0.85
+          }).addTo(mapa);
+          const quando = v.entregue_em ? new Date(v.entregue_em).toLocaleString('pt-BR') : '';
+          marcador.bindPopup(`<b>${rotuloDoProduto(v.produto)}</b> · O.S. Nº${v.id}<br>${v.cliente_nome || 'Avulso'}<br>${v.entregador_nome || ''}<br>${quando}`);
+          marcadoresEntrega.push(marcador);
+        });
+
+        if (!ajustouZoomInicial && pontos.length > 0) {
+          mapa.fitBounds(pontos, { padding: [40, 40], maxZoom: 15 });
+          ajustouZoomInicial = true;
+        }
+
+        document.getElementById('status-atualizacao').textContent =
+          'Atualizado às ' + new Date().toLocaleTimeString('pt-BR');
+
+        const lista = document.getElementById('lista-entregas-hoje');
+        if (dados.entregasHoje.length === 0) {
+          lista.innerHTML = '<div class="vazio-lista">Nenhuma entrega finalizada hoje ainda.</div>';
+        } else {
+          lista.innerHTML = `
+            <table>
+              <thead><tr><th>O.S.</th><th>Produto</th><th>Cliente</th><th>Entregador</th><th>Horário</th><th>Local</th></tr></thead>
+              <tbody>
+                ${dados.entregasHoje.map((v) => `
+                  <tr>
+                    <td><span class="selo-os">Nº ${v.id}</span></td>
+                    <td>${rotuloDoProduto(v.produto)}</td>
+                    <td>${v.cliente_nome || 'Avulso'}</td>
+                    <td>${v.entregador_nome || '—'}</td>
+                    <td class="texto-suave">${v.entregue_em ? new Date(v.entregue_em).toLocaleString('pt-BR') : ''}</td>
+                    <td><a target="_blank" href="https://www.google.com/maps?q=${v.entrega_lat},${v.entrega_lng}">ver no mapa</a></td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          `;
+        }
+      } catch (err) {
+        document.getElementById('status-atualizacao').textContent = 'Não foi possível atualizar agora.';
+      }
+    }
+
+    atualizar();
+    setInterval(atualizar, 10000); // atualiza a cada 10 segundos
+  </script>
+</body>
+</html>

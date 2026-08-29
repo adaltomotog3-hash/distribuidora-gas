@@ -1,0 +1,20 @@
+{
+  "name": "distribuidora-gas",
+  "version": "1.0.0",
+  "description": "Sistema de gestao para distribuidora de gas",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "bcrypt": "^5.1.1",
+    "dotenv": "^16.4.5",
+    "ejs": "^3.1.10",
+    "express": "^4.19.2",
+    "express-async-errors": "^3.1.1",
+    "express-session": "^1.18.0",
+    "helmet": "^8.3.0",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.12.0"
+  }
+}

@@ -1,0 +1,141 @@
+const express = require('express');
+const pool = require('../db/pool');
+
+const router = express.Router();
+
+const PERIODOS_VALIDOS = ['dia', 'semana', 'quinzena', 'mes', 'ano'];
+
+const CAMPOS = `
+    COUNT(*)::int AS total_pedidos,
+    COALESCE(SUM(r.qtd_itens), 0)::int AS total_itens,
+    COALESCE(SUM(r.qtd_gas), 0)::int AS qtd_gas,
+    COALESCE(SUM(r.qtd_agua), 0)::int AS qtd_agua,
+    COALESCE(SUM(r.valor_gas), 0) AS valor_gas,
+    COALESCE(SUM(r.valor_agua), 0) AS valor_agua,
+    COALESCE(SUM(r.desconto), 0) AS total_descontos,
+    COALESCE(SUM(GREATEST(r.valor_bruto - r.desconto, 0)), 0) AS valor_total
+  FROM (
+    SELECT p.id, p.fechado_em, p.desconto,
+      COUNT(i.id)::int AS qtd_itens,
+      COALESCE(SUM(CASE WHEN i.produto = 'gas' THEN i.quantidade ELSE 0 END), 0)::int AS qtd_gas,
+      COALESCE(SUM(CASE WHEN i.produto = 'agua' THEN i.quantidade ELSE 0 END), 0)::int AS qtd_agua,
+      COALESCE(SUM(CASE WHEN i.produto = 'gas' THEN i.preco_unitario * i.quantidade ELSE 0 END), 0) AS valor_gas,
+      COALESCE(SUM(CASE WHEN i.produto = 'agua' THEN i.preco_unitario * i.quantidade ELSE 0 END), 0) AS valor_agua,
+      COALESCE(SUM(i.preco_unitario * i.quantidade), 0) AS valor_bruto
+    FROM pedidos p
+    JOIN itens_pedido i ON i.pedido_id = p.id
+    WHERE p.status = 'fechado'
+    GROUP BY p.id
+  ) r`;
+
+async function buscarPorPeriodo(periodo) {
+  if (periodo === 'quinzena') {
+    const { rows } = await pool.query(`
+      SELECT DATE_TRUNC('month', r.fechado_em) AS mes,
+        CASE WHEN EXTRACT(DAY FROM r.fechado_em) <= 15 THEN 1 ELSE 2 END AS quinzena,
+        ${CAMPOS}
+      GROUP BY DATE_TRUNC('month', r.fechado_em), CASE WHEN EXTRACT(DAY FROM r.fechado_em) <= 15 THEN 1 ELSE 2 END
+      ORDER BY mes DESC, quinzena DESC
+      LIMIT 12
+    `);
+    return rows;
+  }
+
+  const truncPorPeriodo = { dia: 'day', semana: 'week', mes: 'month', ano: 'year' };
+  const limitePorPeriodo = { dia: 30, semana: 12, mes: 12, ano: 6 };
+  const trunc = truncPorPeriodo[periodo] || 'day';
+  const limite = limitePorPeriodo[periodo] || 30;
+
+  const { rows } = await pool.query(`
+    SELECT DATE_TRUNC('${trunc}', r.fechado_em) AS periodo,
+      ${CAMPOS}
+    GROUP BY DATE_TRUNC('${trunc}', r.fechado_em)
+    ORDER BY periodo DESC
+    LIMIT ${limite}
+  `);
+  return rows;
+}
+
+function formatarLabel(row, periodo) {
+  if (periodo === 'quinzena') {
+    const mes = new Date(row.mes);
+    const nomeMes = mes.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+    return (row.quinzena === 1 ? '1ª quinzena' : '2ª quinzena') + ' de ' + nomeMes;
+  }
+  const data = new Date(row.periodo);
+  if (periodo === 'dia') {
+    return data.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
+  }
+  if (periodo === 'semana') {
+    const fim = new Date(data);
+    fim.setDate(fim.getDate() + 6);
+    return 'Semana de ' + data.toLocaleDateString('pt-BR') + ' a ' + fim.toLocaleDateString('pt-BR');
+  }
+  if (periodo === 'mes') {
+    return data.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  }
+  if (periodo === 'ano') {
+    return String(data.getFullYear());
+  }
+  return '';
+}
+
+// --- Relatório de entregas: quem entregou cada O.S., num intervalo de datas ---
+async function buscarRelatorioEntregas(inicio, fim) {
+  const porEntregadorResult = await pool.query(
+    `SELECT COALESCE(e.nome, 'Escritório / sem entregador') AS entregador_nome,
+       COUNT(p.id)::int AS total_entregas,
+       COALESCE(SUM(GREATEST(r.valor_bruto - p.desconto, 0)), 0) AS valor_total
+     FROM pedidos p
+     LEFT JOIN entregadores e ON e.id = p.entregador_id
+     JOIN (
+       SELECT pedido_id, COALESCE(SUM(preco_unitario * quantidade), 0) AS valor_bruto
+       FROM itens_pedido GROUP BY pedido_id
+     ) r ON r.pedido_id = p.id
+     WHERE p.status = 'fechado' AND p.entrega_status = 'entregue'
+       AND p.entregue_em::date BETWEEN $1 AND $2
+     GROUP BY e.nome
+     ORDER BY total_entregas DESC`,
+    [inicio, fim]
+  );
+
+  const detalheResult = await pool.query(
+    `SELECT p.id, p.entregue_em, p.baixado_em,
+       COALESCE(c.nome, p.nome_avulso, 'Cliente avulso') AS cliente_nome,
+       COALESCE(e.nome, 'Escritório / sem entregador') AS entregador_nome,
+       (SELECT GREATEST(COALESCE(SUM(i.preco_unitario * i.quantidade), 0) - p.desconto, 0) FROM itens_pedido i WHERE i.pedido_id = p.id) AS total_valor,
+       (SELECT STRING_AGG(i.quantidade || 'x ' || COALESCE(pd.nome, CASE WHEN i.produto = 'agua' THEN 'Água' ELSE 'Gás' END), ', ' ORDER BY i.id)
+          FROM itens_pedido i LEFT JOIN produtos pd ON pd.id = i.produto_id WHERE i.pedido_id = p.id) AS resumo_itens
+     FROM pedidos p
+     LEFT JOIN clientes c ON c.id = p.cliente_id
+     LEFT JOIN entregadores e ON e.id = p.entregador_id
+     WHERE p.status = 'fechado' AND p.entrega_status = 'entregue'
+       AND p.entregue_em::date BETWEEN $1 AND $2
+     ORDER BY p.entregue_em DESC
+     LIMIT 300`,
+    [inicio, fim]
+  );
+
+  return { porEntregador: porEntregadorResult.rows, detalhe: detalheResult.rows };
+}
+
+router.get('/relatorios', async (req, res) => {
+  const tipoQuery = req.query.tipo;
+  const tipo = ['financeiro', 'entregas'].includes(tipoQuery) ? tipoQuery : 'vendas';
+  const periodo = PERIODOS_VALIDOS.includes(req.query.periodo) ? req.query.periodo : 'dia';
+
+  if (tipo === 'entregas') {
+    const hoje = new Date().toISOString().slice(0, 10);
+    const inicio = req.query.inicio || hoje;
+    const fim = req.query.fim || hoje;
+    const { porEntregador, detalhe } = await buscarRelatorioEntregas(inicio, fim);
+    return res.render('relatorios', { tipo, periodo, linhas: [], inicio, fim, porEntregador, detalhe });
+  }
+
+  const linhasBrutas = await buscarPorPeriodo(periodo);
+  const linhas = linhasBrutas.map((row) => ({ ...row, label: formatarLabel(row, periodo) }));
+
+  res.render('relatorios', { tipo, periodo, linhas, inicio: null, fim: null, porEntregador: [], detalhe: [] });
+});
+
+module.exports = router;

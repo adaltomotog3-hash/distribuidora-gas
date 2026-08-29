@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <%- include('partials/head', { titulo: 'Editar cliente' }) %>
+</head>
+<body>
+  <div class="app">
+    <%- include('partials/sidebar', { paginaAtual: 'clientes' }) %>
+
+    <div class="conteudo">
+
+      <%- include('partials/flash') %>
+      <div class="topo-pagina">
+        <div>
+          <h1>Editar cliente — <%= cliente.nome %></h1>
+          <p>Atualize os dados e o endereço do cliente</p>
+        </div>
+        <a class="botao botao-secundario" href="/clientes">‹ Voltar</a>
+      </div>
+
+      <div class="painel">
+        <div class="painel-titulo">Dados do cliente</div>
+        <form method="POST" action="/clientes/<%= cliente.id %>/editar" class="form-grade">
+          <div>
+            <label>Nome</label>
+            <input type="text" name="nome" value="<%= cliente.nome %>" required>
+          </div>
+          <div>
+            <label>Telefone</label>
+            <input type="text" name="telefone" value="<%= cliente.telefone || '' %>">
+          </div>
+          <%- include('partials/campos-endereco', { cliente }) %>
+          <div style="grid-column: 1 / -1;">
+            <label>Observação</label>
+            <input type="text" name="observacao" value="<%= cliente.observacao || '' %>">
+          </div>
+          <div class="form-acoes">
+            <button class="botao" type="submit">Salvar alterações</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <%- include('partials/mapa-endereco') %>
+</body>
+</html>

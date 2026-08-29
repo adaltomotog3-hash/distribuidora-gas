@@ -1,0 +1,139 @@
+<%
+  var nomesFormaPagamento = { dinheiro: 'Dinheiro', pix: 'Pix', cartao: 'Cartão', fiado: 'Fiado' };
+  var iconesFormaPagamento = { dinheiro: '💵', pix: '📱', cartao: '💳', fiado: '📝' };
+  var mapaFormas = {};
+  porFormaPagamento.forEach(function(f) { mapaFormas[f.forma_pagamento] = f; });
+  var formasParaMostrar = ['dinheiro', 'pix', 'cartao'];
+  if (mapaFormas.fiado) formasParaMostrar.push('fiado');
+%>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <%- include('partials/head', { titulo: 'Financeiro' }) %>
+</head>
+<body>
+  <div class="app">
+    <%- include('partials/sidebar', { paginaAtual: 'financeiro' }) %>
+
+    <div class="conteudo">
+
+      <%- include('partials/flash') %>
+      <div class="topo-pagina">
+        <div>
+          <h1>Financeiro</h1>
+          <p>Tudo que foi vendido, calculado automaticamente</p>
+        </div>
+      </div>
+
+      <div class="painel">
+        <form method="GET" action="/financeiro" class="form-grade">
+          <div>
+            <label>De</label>
+            <input type="date" name="inicio" value="<%= dataInicio %>">
+          </div>
+          <div>
+            <label>Até</label>
+            <input type="date" name="fim" value="<%= dataFim %>">
+          </div>
+          <div class="form-acoes">
+            <button class="botao" type="submit">Filtrar período</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="grade-cards">
+        <div class="card destaque-verde">
+          <div class="rotulo">Total de vendas no período</div>
+          <div class="valor"><%= totalGeral.total_vendas %></div>
+        </div>
+        <div class="card destaque-verde">
+          <div class="rotulo">Valor total no período (já com desconto)</div>
+          <div class="valor">R$ <%= Number(totalGeral.total_valor).toFixed(2) %></div>
+        </div>
+        <div class="card">
+          <div class="rotulo">Descontos concedidos</div>
+          <div class="valor">R$ <%= Number(totalGeral.total_descontos).toFixed(2) %></div>
+        </div>
+        <div class="card">
+          <div class="rotulo">Pendentes (aguardando vazio)</div>
+          <div class="valor"><%= pendentesFinanceiro.total %> · R$ <%= Number(pendentesFinanceiro.valor).toFixed(2) %></div>
+        </div>
+      </div>
+
+      <div class="painel">
+        <div class="painel-titulo">Total por dia — saldo de entrada de cada dia</div>
+        <% if (porDia.length === 0) { %>
+          <div class="vazio-lista">Nenhuma venda no período.</div>
+        <% } else { %>
+          <table>
+            <thead><tr><th>Data</th><th>Pedidos</th><th>Total do dia</th></tr></thead>
+            <tbody>
+              <% porDia.forEach(function(d) { %>
+                <tr>
+                  <td><%= new Date(d.dia).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) %></td>
+                  <td><%= d.total_pedidos %></td>
+                  <td><strong>R$ <%= Number(d.valor_total).toFixed(2) %></strong></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        <% } %>
+      </div>
+
+      <div class="painel">
+        <div class="painel-titulo">Por produto (Gás x Água)</div>
+        <p class="texto-suave painel-subtitulo" style="padding-bottom:10px;">Valores brutos, sem descontos (o desconto de cada pedido já está descontado só no total geral acima).</p>
+        <table>
+          <thead><tr><th>Produto</th><th>Qtd. vendas</th><th>Total</th></tr></thead>
+          <tbody>
+            <% porProduto.forEach(function(p) { %>
+              <tr>
+                <td><%= p.produto === 'agua' ? 'Água' : 'Gás' %></td>
+                <td><%= p.total_vendas %></td>
+                <td>R$ <%= Number(p.total_valor).toFixed(2) %></td>
+              </tr>
+            <% }) %>
+            <% if (porProduto.length === 0) { %>
+              <tr><td colspan="3" class="vazio-lista">Nenhuma venda no período.</td></tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="painel">
+        <div class="painel-titulo">Por forma de pagamento — quanto entrou em cada uma</div>
+        <div class="grade-formas-pagamento">
+          <% formasParaMostrar.forEach(function(forma) { %>
+            <% var dados = mapaFormas[forma] || { total_vendas: 0, total_valor: 0 }; %>
+            <div class="card-forma-pagamento forma-<%= forma %>">
+              <div class="icone-forma-pagamento"><%= iconesFormaPagamento[forma] %></div>
+              <div class="nome-forma-pagamento"><%= nomesFormaPagamento[forma] %></div>
+              <div class="valor-forma-pagamento">R$ <%= Number(dados.total_valor).toFixed(2) %></div>
+              <div class="qtd-forma-pagamento"><%= dados.total_vendas %> venda<%= dados.total_vendas === 1 ? '' : 's' %></div>
+            </div>
+          <% }) %>
+        </div>
+      </div>
+
+      <div class="painel">
+        <div class="painel-titulo">Por tipo de venda</div>
+        <table>
+          <thead><tr><th>Tipo</th><th>Qtd. vendas</th><th>Total</th></tr></thead>
+          <tbody>
+            <% porTipo.forEach(function(t) { %>
+              <tr>
+                <td><%= t.tipo_venda === 'troca' ? 'Com troca' : 'Sem troca' %></td>
+                <td><%= t.total_vendas %></td>
+                <td>R$ <%= Number(t.total_valor).toFixed(2) %></td>
+              </tr>
+            <% }) %>
+            <% if (porTipo.length === 0) { %>
+              <tr><td colspan="3" class="vazio-lista">Nenhuma venda no período.</td></tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

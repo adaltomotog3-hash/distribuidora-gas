@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <%- include('partials/head', { titulo: 'Preços' }) %>
+</head>
+<body>
+  <div class="app">
+    <%- include('partials/sidebar', { paginaAtual: 'precos' }) %>
+
+    <div class="conteudo">
+
+      <%- include('partials/flash') %>
+      <div class="topo-pagina">
+        <div>
+          <h1>Preços</h1>
+          <p>Valores usados automaticamente ao registrar uma venda. Pra criar um produto novo, vá em Estoque.</p>
+        </div>
+      </div>
+
+      <div class="painel">
+        <div class="painel-titulo">🔥 Gás</div>
+        <% if (gruposGas.length === 0) { %>
+          <div class="vazio-lista">Nenhum produto de gás cadastrado ainda.</div>
+        <% } %>
+        <% gruposGas.forEach(function(grupo) { %>
+          <%- include('partials/precos-produto', { grupo: grupo }) %>
+        <% }) %>
+      </div>
+
+      <div class="painel">
+        <div class="painel-titulo">💧 Água</div>
+        <% if (gruposAgua.length === 0) { %>
+          <div class="vazio-lista">Nenhum produto de água cadastrado ainda.</div>
+        <% } %>
+        <% gruposAgua.forEach(function(grupo) { %>
+          <%- include('partials/precos-produto', { grupo: grupo }) %>
+        <% }) %>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

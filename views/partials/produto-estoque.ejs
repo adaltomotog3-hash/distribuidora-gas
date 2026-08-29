@@ -1,0 +1,97 @@
+<div class="card-produto-estoque">
+  <div class="card-produto-cabecalho">
+    <div class="nome-produto-estoque"><%= produto.nome %></div>
+    <div class="card-produto-quantidades">
+      <div class="qtd-bloco qtd-bloco-cheio">
+        <div class="qtd-numero"><%= produto.qtd_cheios %></div>
+        <div class="qtd-rotulo">Cheios</div>
+      </div>
+      <div class="qtd-bloco qtd-bloco-vazio">
+        <div class="qtd-numero"><%= produto.qtd_vazios %></div>
+        <div class="qtd-rotulo">Vazios</div>
+      </div>
+    </div>
+    <button class="botao botao-secundario botao-pequeno" type="button" data-abrir-detalhe="<%= produto.id %>">Gerenciar</button>
+  </div>
+
+  <div class="card-produto-detalhe" id="detalhe-<%= produto.id %>" style="display:none;">
+    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+      <form method="POST" action="/estoque/produtos/<%= produto.id %>/desativar" onsubmit="return confirm('Desativar \'<%= produto.nome %>\'? Ele some da lista de venda, mas o histórico continua salvo.');" style="display:inline;">
+        <button class="botao botao-secundario botao-pequeno" type="submit">Desativar produto</button>
+      </form>
+    </div>
+
+    <div class="form-grade" style="padding:0; margin-bottom:12px;">
+      <form method="POST" action="/estoque/produtos/<%= produto.id %>/editar" style="display:contents;">
+        <div>
+          <label>Nome do produto</label>
+          <input type="text" name="nome" value="<%= produto.nome %>" required>
+        </div>
+        <div class="form-acoes" style="grid-column:auto;">
+          <button class="botao botao-secundario botao-pequeno" type="submit">Salvar nome</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="form-grade" style="padding:0; margin-bottom:12px;">
+      <form method="POST" action="/estoque/produtos/<%= produto.id %>/corrigir" style="display:contents;">
+        <div>
+          <label>Corrigir cheios</label>
+          <input type="number" min="0" name="qtd_cheios" value="<%= produto.qtd_cheios %>">
+        </div>
+        <div>
+          <label>Corrigir vazios</label>
+          <input type="number" min="0" name="qtd_vazios" value="<%= produto.qtd_vazios %>">
+        </div>
+        <div class="form-acoes" style="grid-column:auto;">
+          <button class="botao botao-secundario botao-pequeno" type="submit">Salvar quantidade</button>
+        </div>
+      </form>
+    </div>
+
+    <details>
+      <summary class="texto-suave" style="cursor:pointer;">Registrar entrada/saída (compra do fornecedor, devolução de vazio)</summary>
+      <div style="margin-top:10px; display:flex; flex-direction:column; gap:10px;">
+        <form method="POST" action="/estoque/produtos/<%= produto.id %>/entrada-cheio" class="form-grade">
+          <div>
+            <label>Entrada de cheios (compra do fornecedor)</label>
+            <input type="number" min="1" name="quantidade">
+          </div>
+          <div>
+            <label>Observação</label>
+            <input type="text" name="observacao">
+          </div>
+          <div class="form-acoes">
+            <button class="botao botao-secundario botao-pequeno" type="submit">Registrar entrada</button>
+          </div>
+        </form>
+        <form method="POST" action="/estoque/produtos/<%= produto.id %>/entrada-vazio" class="form-grade">
+          <div>
+            <label>Adicionar vazios</label>
+            <input type="number" min="1" name="quantidade">
+          </div>
+          <div>
+            <label>Observação</label>
+            <input type="text" name="observacao">
+          </div>
+          <div class="form-acoes">
+            <button class="botao botao-secundario botao-pequeno" type="submit">Adicionar vazios</button>
+          </div>
+        </form>
+        <form method="POST" action="/estoque/produtos/<%= produto.id %>/saida-vazio" class="form-grade">
+          <div>
+            <label>Retirar vazios (ex: devolvidos ao fornecedor)</label>
+            <input type="number" min="1" name="quantidade">
+          </div>
+          <div>
+            <label>Observação</label>
+            <input type="text" name="observacao">
+          </div>
+          <div class="form-acoes">
+            <button class="botao botao-secundario botao-pequeno" type="submit">Retirar vazios</button>
+          </div>
+        </form>
+      </div>
+    </details>
+  </div>
+</div>
