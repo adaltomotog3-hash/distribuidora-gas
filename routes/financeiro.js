@@ -88,6 +88,22 @@ router.get('/financeiro', async (req, res) => {
     [dataInicio, dataFim]
   );
 
+  // "Valores a receber": vendas fiado já fechadas que ainda não foram pagas —
+  // independe do período filtrado acima, porque uma dívida antiga continua
+  // valendo até ser paga, não só enquanto está dentro do intervalo de datas.
+  const valoresAReceberResult = await pool.query(
+    `SELECT p.id, p.fechado_em,
+       COALESCE(c.nome, p.nome_avulso, 'Cliente avulso') AS cliente_nome,
+       GREATEST(COALESCE(SUM(i.preco_unitario * i.quantidade), 0) - p.desconto, 0) AS valor
+     FROM pedidos p
+     JOIN itens_pedido i ON i.pedido_id = p.id
+     LEFT JOIN clientes c ON c.id = p.cliente_id
+     WHERE p.status = 'fechado' AND p.forma_pagamento = 'fiado' AND p.fiado_pago_em IS NULL
+     GROUP BY p.id, p.fechado_em, c.nome, p.nome_avulso, p.desconto
+     ORDER BY p.fechado_em ASC`
+  );
+  const totalAReceber = valoresAReceberResult.rows.reduce((soma, r) => soma + Number(r.valor), 0);
+
   res.render('financeiro', {
     dataInicio,
     dataFim,
@@ -96,7 +112,9 @@ router.get('/financeiro', async (req, res) => {
     porTipo: porTipoResult.rows,
     porProduto: porProdutoResult.rows,
     porDia: porDiaResult.rows,
-    pendentesFinanceiro: pendentesFinanceiroResult.rows[0]
+    pendentesFinanceiro: pendentesFinanceiroResult.rows[0],
+    valoresAReceber: valoresAReceberResult.rows,
+    totalAReceber
   });
 });
 

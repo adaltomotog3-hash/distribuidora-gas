@@ -385,6 +385,31 @@ router.post('/pedidos/:id/finalizar', async (req, res) => {
   res.redirect(req.get('Referrer') && req.get('Referrer').includes('/pedidos/') ? '/pedidos/' + pedido.id : '/os');
 });
 
+// --- Marca uma venda fiado como paga (o cliente quitou o valor devido) ---
+// Pede a forma de pagamento real (como o dinheiro efetivamente entrou), já que
+// "fiado" era só um jeito de dizer "ainda não recebi" — agora que recebeu,
+// precisa saber se foi em dinheiro, Pix ou cartão.
+router.post('/pedidos/:id/marcar-fiado-pago', async (req, res) => {
+  const voltarPara = req.get('Referrer') || '/financeiro';
+  const formaRecebimento = req.body.forma_pagamento_recebimento;
+
+  if (!['dinheiro', 'pix', 'cartao'].includes(formaRecebimento)) {
+    req.setFlash('erro', 'Selecione como o cliente pagou (dinheiro, Pix ou cartão).');
+    return res.redirect(voltarPara);
+  }
+
+  const { rowCount } = await pool.query(
+    `UPDATE pedidos SET fiado_pago_em = NOW(), forma_pagamento_recebimento = $1
+     WHERE id = $2 AND forma_pagamento = 'fiado' AND status = 'fechado' AND fiado_pago_em IS NULL`,
+    [formaRecebimento, req.params.id]
+  );
+  req.setFlash(
+    rowCount > 0 ? 'sucesso' : 'erro',
+    rowCount > 0 ? 'Pagamento registrado — saiu de "Valores a receber".' : 'Não foi possível registrar esse pagamento.'
+  );
+  res.redirect(voltarPara);
+});
+
 // --- Confirma que o vazio de um item específico voltou ---
 router.post('/pedidos/:id/itens/:itemId/confirmar-vazio', async (req, res) => {
   const itemResult = await pool.query(

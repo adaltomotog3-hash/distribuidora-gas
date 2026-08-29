@@ -464,6 +464,19 @@ async function initDb() {
     }
   }
 
+  // --- MIGRAÇÃO: controle de "Valores a receber" (vendas fiado) ---
+  // Quando o pedido é fechado como "fiado", ele fica pendente de pagamento até
+  // alguém marcar que o cliente pagou — independente da baixa do vasilhame acima.
+  const colunasFiado = [
+    ['fiado_pago_em', 'TIMESTAMP'],
+    ['forma_pagamento_recebimento', 'TEXT']
+  ];
+  for (const [coluna, definicao] of colunasFiado) {
+    if (!(await columnExists('pedidos', coluna))) {
+      await pool.query(`ALTER TABLE pedidos ADD COLUMN ${coluna} ${definicao}`);
+    }
+  }
+
   console.log('>> Banco de dados pronto.');
 }
 

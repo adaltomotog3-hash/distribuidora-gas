@@ -106,13 +106,50 @@
           <% formasParaMostrar.forEach(function(forma) { %>
             <% var dados = mapaFormas[forma] || { total_vendas: 0, total_valor: 0 }; %>
             <div class="card-forma-pagamento forma-<%= forma %>">
-              <div class="icone-forma-pagamento"><%= iconesFormaPagamento[forma] %></div>
+              <div class="icone-forma-pagamento">
+                <% if (forma === 'pix') { %><img src="/img/pix.svg" alt="Pix" style="width:22px; height:22px; vertical-align:middle;"><% } else { %><%= iconesFormaPagamento[forma] %><% } %>
+              </div>
               <div class="nome-forma-pagamento"><%= nomesFormaPagamento[forma] %></div>
               <div class="valor-forma-pagamento">R$ <%= Number(dados.total_valor).toFixed(2) %></div>
               <div class="qtd-forma-pagamento"><%= dados.total_vendas %> venda<%= dados.total_vendas === 1 ? '' : 's' %></div>
             </div>
           <% }) %>
         </div>
+      </div>
+
+      <div class="painel">
+        <div class="painel-titulo">
+          💳 Valores a receber (fiado)
+          <% if (valoresAReceber.length > 0) { %><span class="selo selo-aguardando">R$ <%= Number(totalAReceber).toFixed(2) %></span><% } %>
+        </div>
+        <p class="texto-suave painel-subtitulo">Vendas fechadas como fiado que o cliente ainda não pagou — não depende do período filtrado acima.</p>
+        <% if (valoresAReceber.length === 0) { %>
+          <div class="vazio-lista">Nenhum valor a receber no momento.</div>
+        <% } else { %>
+          <table>
+            <thead><tr><th>Cliente</th><th>Data da venda</th><th>Valor</th><th></th></tr></thead>
+            <tbody>
+              <% valoresAReceber.forEach(function(r) { %>
+                <tr>
+                  <td><%= r.cliente_nome %></td>
+                  <td class="texto-suave"><%= new Date(r.fechado_em).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) %></td>
+                  <td><strong>R$ <%= Number(r.valor).toFixed(2) %></strong></td>
+                  <td>
+                    <form method="POST" action="/pedidos/<%= r.id %>/marcar-fiado-pago" class="marcar-fiado-pago-form" style="display:flex; gap:6px; align-items:center;">
+                      <select name="forma_pagamento_recebimento" required style="max-width:130px;">
+                        <option value="" disabled selected>Pagou em...</option>
+                        <option value="dinheiro">💵 Dinheiro</option>
+                        <option value="pix">Pix</option>
+                        <option value="cartao">💳 Cartão</option>
+                      </select>
+                      <button class="botao botao-secundario botao-pequeno" type="submit">✔️ Confirmar</button>
+                    </form>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        <% } %>
       </div>
 
       <div class="painel">
@@ -135,5 +172,18 @@
       </div>
     </div>
   </div>
+
+  <script>
+    document.querySelectorAll('.marcar-fiado-pago-form').forEach(function (form) {
+      form.addEventListener('submit', function (e) {
+        if (form.dataset.enviando) return;
+        if (!confirm('Confirma que esse cliente já pagou? Ele sai da lista de "Valores a receber".')) {
+          e.preventDefault();
+          return;
+        }
+        form.dataset.enviando = '1';
+      });
+    });
+  </script>
 </body>
 </html>
