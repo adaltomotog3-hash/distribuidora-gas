@@ -24,7 +24,7 @@ router.get('/', async (req, res) => {
   );
 
   const resumoHojeResult = await pool.query(`
-    SELECT COUNT(DISTINCT p.id)::int AS total_vendas, COALESCE(SUM(i.preco_unitario * i.quantidade), 0) AS total_valor
+    SELECT COALESCE(SUM(i.quantidade), 0)::int AS total_vendas, COALESCE(SUM(i.preco_unitario * i.quantidade), 0) AS total_valor
     FROM pedidos p
     JOIN itens_pedido i ON i.pedido_id = p.id
     WHERE p.status = 'fechado' AND p.fechado_em::date = CURRENT_DATE

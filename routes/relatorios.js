@@ -16,7 +16,7 @@ const CAMPOS = `
     COALESCE(SUM(GREATEST(r.valor_bruto - r.desconto, 0)), 0) AS valor_total
   FROM (
     SELECT p.id, p.fechado_em, p.desconto,
-      COUNT(i.id)::int AS qtd_itens,
+      COALESCE(SUM(i.quantidade), 0)::int AS qtd_itens,
       COALESCE(SUM(CASE WHEN i.produto = 'gas' THEN i.quantidade ELSE 0 END), 0)::int AS qtd_gas,
       COALESCE(SUM(CASE WHEN i.produto = 'agua' THEN i.quantidade ELSE 0 END), 0)::int AS qtd_agua,
       COALESCE(SUM(CASE WHEN i.produto = 'gas' THEN i.preco_unitario * i.quantidade ELSE 0 END), 0) AS valor_gas,
@@ -56,6 +56,39 @@ async function buscarPorPeriodo(periodo) {
   return rows;
 }
 
+// Card "atual" no topo: mostra só o período que está sendo visto agora (hoje, essa
+// semana, esse mês...), não a soma de todos os períodos listados na tabela abaixo.
+const ROTULOS_PERIODO_ATUAL = {
+  dia: 'Hoje',
+  semana: 'Essa semana',
+  quinzena: 'Essa quinzena',
+  mes: 'Esse mês',
+  ano: 'Esse ano'
+};
+
+async function buscarPeriodoAtual(periodo) {
+  let condicao;
+  if (periodo === 'semana') {
+    condicao = `DATE_TRUNC('week', r.fechado_em) = DATE_TRUNC('week', CURRENT_DATE)`;
+  } else if (periodo === 'quinzena') {
+    condicao = `DATE_TRUNC('month', r.fechado_em) = DATE_TRUNC('month', CURRENT_DATE)
+      AND (CASE WHEN EXTRACT(DAY FROM r.fechado_em) <= 15 THEN 1 ELSE 2 END)
+        = (CASE WHEN EXTRACT(DAY FROM CURRENT_DATE) <= 15 THEN 1 ELSE 2 END)`;
+  } else if (periodo === 'mes') {
+    condicao = `DATE_TRUNC('month', r.fechado_em) = DATE_TRUNC('month', CURRENT_DATE)`;
+  } else if (periodo === 'ano') {
+    condicao = `DATE_TRUNC('year', r.fechado_em) = DATE_TRUNC('year', CURRENT_DATE)`;
+  } else {
+    condicao = `r.fechado_em::date = CURRENT_DATE`;
+  }
+
+  const { rows } = await pool.query(`
+    SELECT ${CAMPOS}
+    WHERE ${condicao}
+  `);
+  return rows[0];
+}
+
 function formatarLabel(row, periodo) {
   if (periodo === 'quinzena') {
     const mes = new Date(row.mes);
@@ -80,7 +113,74 @@ function formatarLabel(row, periodo) {
   return '';
 }
 
-// --- Relatório de entregas: quem entregou cada O.S., num intervalo de datas ---
+// --- Relatório de entregas por período (mesmo padrão do de vendas/financeiro):
+// tabela com o histórico dos últimos períodos + card "atual" só com o período selecionado ---
+const BASE_ENTREGAS = `
+  FROM pedidos p
+  JOIN (
+    SELECT pedido_id, COALESCE(SUM(preco_unitario * quantidade), 0) AS valor_bruto
+    FROM itens_pedido GROUP BY pedido_id
+  ) r ON r.pedido_id = p.id
+  WHERE p.status = 'fechado' AND p.entrega_status = 'entregue'`;
+
+async function buscarEntregasPorPeriodo(periodo) {
+  if (periodo === 'quinzena') {
+    const { rows } = await pool.query(`
+      SELECT DATE_TRUNC('month', p.entregue_em) AS mes,
+        CASE WHEN EXTRACT(DAY FROM p.entregue_em) <= 15 THEN 1 ELSE 2 END AS quinzena,
+        COUNT(p.id)::int AS total_entregas,
+        COALESCE(SUM(GREATEST(r.valor_bruto - p.desconto, 0)), 0) AS valor_total
+      ${BASE_ENTREGAS}
+      GROUP BY DATE_TRUNC('month', p.entregue_em), CASE WHEN EXTRACT(DAY FROM p.entregue_em) <= 15 THEN 1 ELSE 2 END
+      ORDER BY mes DESC, quinzena DESC
+      LIMIT 12
+    `);
+    return rows;
+  }
+
+  const truncPorPeriodo = { dia: 'day', semana: 'week', mes: 'month', ano: 'year' };
+  const limitePorPeriodo = { dia: 30, semana: 12, mes: 12, ano: 6 };
+  const trunc = truncPorPeriodo[periodo] || 'day';
+  const limite = limitePorPeriodo[periodo] || 30;
+
+  const { rows } = await pool.query(`
+    SELECT DATE_TRUNC('${trunc}', p.entregue_em) AS periodo,
+      COUNT(p.id)::int AS total_entregas,
+      COALESCE(SUM(GREATEST(r.valor_bruto - p.desconto, 0)), 0) AS valor_total
+    ${BASE_ENTREGAS}
+    GROUP BY DATE_TRUNC('${trunc}', p.entregue_em)
+    ORDER BY periodo DESC
+    LIMIT ${limite}
+  `);
+  return rows;
+}
+
+async function buscarEntregasPeriodoAtual(periodo) {
+  let condicao;
+  if (periodo === 'semana') {
+    condicao = `DATE_TRUNC('week', p.entregue_em) = DATE_TRUNC('week', CURRENT_DATE)`;
+  } else if (periodo === 'quinzena') {
+    condicao = `DATE_TRUNC('month', p.entregue_em) = DATE_TRUNC('month', CURRENT_DATE)
+      AND (CASE WHEN EXTRACT(DAY FROM p.entregue_em) <= 15 THEN 1 ELSE 2 END)
+        = (CASE WHEN EXTRACT(DAY FROM CURRENT_DATE) <= 15 THEN 1 ELSE 2 END)`;
+  } else if (periodo === 'mes') {
+    condicao = `DATE_TRUNC('month', p.entregue_em) = DATE_TRUNC('month', CURRENT_DATE)`;
+  } else if (periodo === 'ano') {
+    condicao = `DATE_TRUNC('year', p.entregue_em) = DATE_TRUNC('year', CURRENT_DATE)`;
+  } else {
+    condicao = `p.entregue_em::date = CURRENT_DATE`;
+  }
+
+  const { rows } = await pool.query(`
+    SELECT COUNT(p.id)::int AS total_entregas,
+      COALESCE(SUM(GREATEST(r.valor_bruto - p.desconto, 0)), 0) AS valor_total
+    ${BASE_ENTREGAS}
+      AND ${condicao}
+  `);
+  return rows[0];
+}
+
+// --- Relatório de entregas: quem entregou cada O.S., num intervalo de datas escolhido ---
 async function buscarRelatorioEntregas(inicio, fim) {
   const porEntregadorResult = await pool.query(
     `SELECT COALESCE(e.nome, 'Escritório / sem entregador') AS entregador_nome,
@@ -128,14 +228,26 @@ router.get('/relatorios', async (req, res) => {
     const hoje = new Date().toISOString().slice(0, 10);
     const inicio = req.query.inicio || hoje;
     const fim = req.query.fim || hoje;
-    const { porEntregador, detalhe } = await buscarRelatorioEntregas(inicio, fim);
-    return res.render('relatorios', { tipo, periodo, linhas: [], inicio, fim, porEntregador, detalhe });
+
+    const [{ porEntregador, detalhe }, linhasBrutas, atual] = await Promise.all([
+      buscarRelatorioEntregas(inicio, fim),
+      buscarEntregasPorPeriodo(periodo),
+      buscarEntregasPeriodoAtual(periodo)
+    ]);
+    const linhas = linhasBrutas.map((row) => ({ ...row, label: formatarLabel(row, periodo) }));
+    const rotuloAtual = ROTULOS_PERIODO_ATUAL[periodo] || 'Período atual';
+
+    return res.render('relatorios', { tipo, periodo, linhas, atual, rotuloAtual, inicio, fim, porEntregador, detalhe });
   }
 
-  const linhasBrutas = await buscarPorPeriodo(periodo);
+  const [linhasBrutas, atual] = await Promise.all([
+    buscarPorPeriodo(periodo),
+    buscarPeriodoAtual(periodo)
+  ]);
   const linhas = linhasBrutas.map((row) => ({ ...row, label: formatarLabel(row, periodo) }));
+  const rotuloAtual = ROTULOS_PERIODO_ATUAL[periodo] || 'Período atual';
 
-  res.render('relatorios', { tipo, periodo, linhas, inicio: null, fim: null, porEntregador: [], detalhe: [] });
+  res.render('relatorios', { tipo, periodo, linhas, atual, rotuloAtual, inicio: null, fim: null, porEntregador: [], detalhe: [] });
 });
 
 module.exports = router;
