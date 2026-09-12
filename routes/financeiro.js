@@ -104,6 +104,21 @@ router.get('/financeiro', async (req, res) => {
   );
   const totalAReceber = valoresAReceberResult.rows.reduce((soma, r) => soma + Number(r.valor), 0);
 
+  // Despesas (saídas de dinheiro) do período, agrupadas por forma de pagamento —
+  // usado pra descontar do saldo de cada forma logo abaixo, do mesmo jeito que
+  // uma venda soma nela.
+  const despesasPorFormaResult = await pool.query(
+    `SELECT forma_pagamento, COUNT(*)::int AS total_despesas, COALESCE(SUM(valor), 0) AS total_valor
+     FROM despesas
+     WHERE criado_em::date BETWEEN $1 AND $2
+     GROUP BY forma_pagamento`,
+    [dataInicio, dataFim]
+  );
+  const mapaDespesasPorForma = {};
+  despesasPorFormaResult.rows.forEach(function (d) { mapaDespesasPorForma[d.forma_pagamento] = d; });
+  const totalDespesas = despesasPorFormaResult.rows.reduce((soma, d) => soma + Number(d.total_valor), 0);
+  const saldoLiquido = Number(totalGeralResult.rows[0].total_valor) - totalDespesas;
+
   res.render('financeiro', {
     dataInicio,
     dataFim,
@@ -114,7 +129,10 @@ router.get('/financeiro', async (req, res) => {
     porDia: porDiaResult.rows,
     pendentesFinanceiro: pendentesFinanceiroResult.rows[0],
     valoresAReceber: valoresAReceberResult.rows,
-    totalAReceber
+    totalAReceber,
+    mapaDespesasPorForma,
+    totalDespesas,
+    saldoLiquido
   });
 });
 

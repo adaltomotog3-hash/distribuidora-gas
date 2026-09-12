@@ -219,9 +219,90 @@ async function buscarRelatorioEntregas(inicio, fim) {
   return { porEntregador: porEntregadorResult.rows, detalhe: detalheResult.rows };
 }
 
+// --- Relatório de saídas (despesas) por período, no mesmo padrão de vendas/financeiro ---
+
+async function buscarDespesasPorPeriodo(periodo) {
+  if (periodo === 'quinzena') {
+    const { rows } = await pool.query(`
+      SELECT DATE_TRUNC('month', criado_em) AS mes,
+        CASE WHEN EXTRACT(DAY FROM criado_em) <= 15 THEN 1 ELSE 2 END AS quinzena,
+        COUNT(*)::int AS total_despesas,
+        COALESCE(SUM(valor), 0) AS valor_total
+      FROM despesas
+      GROUP BY DATE_TRUNC('month', criado_em), CASE WHEN EXTRACT(DAY FROM criado_em) <= 15 THEN 1 ELSE 2 END
+      ORDER BY mes DESC, quinzena DESC
+      LIMIT 12
+    `);
+    return rows;
+  }
+
+  const truncPorPeriodo = { dia: 'day', semana: 'week', mes: 'month', ano: 'year' };
+  const limitePorPeriodo = { dia: 30, semana: 12, mes: 12, ano: 6 };
+  const trunc = truncPorPeriodo[periodo] || 'day';
+  const limite = limitePorPeriodo[periodo] || 30;
+
+  const { rows } = await pool.query(`
+    SELECT DATE_TRUNC('${trunc}', criado_em) AS periodo,
+      COUNT(*)::int AS total_despesas,
+      COALESCE(SUM(valor), 0) AS valor_total
+    FROM despesas
+    GROUP BY DATE_TRUNC('${trunc}', criado_em)
+    ORDER BY periodo DESC
+    LIMIT ${limite}
+  `);
+  return rows;
+}
+
+async function buscarDespesasPeriodoAtual(periodo) {
+  let condicao;
+  if (periodo === 'semana') {
+    condicao = `DATE_TRUNC('week', criado_em) = DATE_TRUNC('week', CURRENT_DATE)`;
+  } else if (periodo === 'quinzena') {
+    condicao = `DATE_TRUNC('month', criado_em) = DATE_TRUNC('month', CURRENT_DATE)
+      AND (CASE WHEN EXTRACT(DAY FROM criado_em) <= 15 THEN 1 ELSE 2 END)
+        = (CASE WHEN EXTRACT(DAY FROM CURRENT_DATE) <= 15 THEN 1 ELSE 2 END)`;
+  } else if (periodo === 'mes') {
+    condicao = `DATE_TRUNC('month', criado_em) = DATE_TRUNC('month', CURRENT_DATE)`;
+  } else if (periodo === 'ano') {
+    condicao = `DATE_TRUNC('year', criado_em) = DATE_TRUNC('year', CURRENT_DATE)`;
+  } else {
+    condicao = `criado_em::date = CURRENT_DATE`;
+  }
+
+  const { rows } = await pool.query(`
+    SELECT COUNT(*)::int AS total_despesas, COALESCE(SUM(valor), 0) AS valor_total
+    FROM despesas
+    WHERE ${condicao}
+  `);
+  return rows[0];
+}
+
+// --- Relatório de saídas: por forma de pagamento + detalhe de cada despesa, num intervalo de datas ---
+async function buscarRelatorioSaidas(inicio, fim) {
+  const porFormaResult = await pool.query(
+    `SELECT forma_pagamento, COUNT(*)::int AS total_despesas, COALESCE(SUM(valor), 0) AS valor_total
+     FROM despesas
+     WHERE criado_em::date BETWEEN $1 AND $2
+     GROUP BY forma_pagamento
+     ORDER BY valor_total DESC`,
+    [inicio, fim]
+  );
+
+  const detalheResult = await pool.query(
+    `SELECT id, criado_em, descricao, valor, forma_pagamento, destino, motivo, registrado_por
+     FROM despesas
+     WHERE criado_em::date BETWEEN $1 AND $2
+     ORDER BY criado_em DESC
+     LIMIT 300`,
+    [inicio, fim]
+  );
+
+  return { porForma: porFormaResult.rows, detalhe: detalheResult.rows };
+}
+
 router.get('/relatorios', async (req, res) => {
   const tipoQuery = req.query.tipo;
-  const tipo = ['financeiro', 'entregas'].includes(tipoQuery) ? tipoQuery : 'vendas';
+  const tipo = ['financeiro', 'entregas', 'saidas'].includes(tipoQuery) ? tipoQuery : 'vendas';
   const periodo = PERIODOS_VALIDOS.includes(req.query.periodo) ? req.query.periodo : 'dia';
 
   if (tipo === 'entregas') {
@@ -237,7 +318,23 @@ router.get('/relatorios', async (req, res) => {
     const linhas = linhasBrutas.map((row) => ({ ...row, label: formatarLabel(row, periodo) }));
     const rotuloAtual = ROTULOS_PERIODO_ATUAL[periodo] || 'Período atual';
 
-    return res.render('relatorios', { tipo, periodo, linhas, atual, rotuloAtual, inicio, fim, porEntregador, detalhe });
+    return res.render('relatorios', { tipo, periodo, linhas, atual, rotuloAtual, inicio, fim, porEntregador, detalhe, porForma: [] });
+  }
+
+  if (tipo === 'saidas') {
+    const hoje = new Date().toISOString().slice(0, 10);
+    const inicio = req.query.inicio || hoje;
+    const fim = req.query.fim || hoje;
+
+    const [{ porForma, detalhe }, linhasBrutas, atual] = await Promise.all([
+      buscarRelatorioSaidas(inicio, fim),
+      buscarDespesasPorPeriodo(periodo),
+      buscarDespesasPeriodoAtual(periodo)
+    ]);
+    const linhas = linhasBrutas.map((row) => ({ ...row, label: formatarLabel(row, periodo) }));
+    const rotuloAtual = ROTULOS_PERIODO_ATUAL[periodo] || 'Período atual';
+
+    return res.render('relatorios', { tipo, periodo, linhas, atual, rotuloAtual, inicio, fim, porEntregador: [], detalhe, porForma });
   }
 
   const [linhasBrutas, atual] = await Promise.all([
@@ -247,7 +344,7 @@ router.get('/relatorios', async (req, res) => {
   const linhas = linhasBrutas.map((row) => ({ ...row, label: formatarLabel(row, periodo) }));
   const rotuloAtual = ROTULOS_PERIODO_ATUAL[periodo] || 'Período atual';
 
-  res.render('relatorios', { tipo, periodo, linhas, atual, rotuloAtual, inicio: null, fim: null, porEntregador: [], detalhe: [] });
+  res.render('relatorios', { tipo, periodo, linhas, atual, rotuloAtual, inicio: null, fim: null, porEntregador: [], detalhe: [], porForma: [] });
 });
 
 module.exports = router;

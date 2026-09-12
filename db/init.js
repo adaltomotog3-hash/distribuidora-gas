@@ -477,6 +477,22 @@ async function initDb() {
     }
   }
 
+  // --- MIGRAÇÃO: despesas (saídas de dinheiro) ---
+  // Cada despesa desconta diretamente do saldo da forma de pagamento em que o
+  // dinheiro saiu (dinheiro/pix/cartão), do mesmo jeito que uma venda soma nela.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS despesas (
+      id SERIAL PRIMARY KEY,
+      descricao TEXT NOT NULL,
+      valor NUMERIC(10,2) NOT NULL,
+      forma_pagamento TEXT NOT NULL, -- 'dinheiro', 'pix' ou 'cartao' — de onde o dinheiro saiu
+      destino TEXT, -- pra onde foi / pra quem foi pago (ex: fornecedor, posto, loja)
+      motivo TEXT, -- motivo da despesa (ex: manutenção, produto de limpeza, combustível)
+      registrado_por TEXT, -- usuário do painel que lançou a despesa
+      criado_em TIMESTAMP DEFAULT NOW()
+    );
+  `);
+
   console.log('>> Banco de dados pronto.');
 }
 

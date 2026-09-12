@@ -47,8 +47,16 @@
           <div class="valor"><%= totalGeral.total_vendas %></div>
         </div>
         <div class="card destaque-verde">
-          <div class="rotulo">Valor total no período (já com desconto)</div>
+          <div class="rotulo">Entrou no período (já com desconto)</div>
           <div class="valor">R$ <%= Number(totalGeral.total_valor).toFixed(2) %></div>
+        </div>
+        <div class="card destaque-vermelho">
+          <div class="rotulo">Despesas no período</div>
+          <div class="valor">R$ <%= Number(totalDespesas).toFixed(2) %></div>
+        </div>
+        <div class="card <%= saldoLiquido >= 0 ? 'destaque-verde' : 'destaque-vermelho' %>">
+          <div class="rotulo">Saldo líquido (entrou − despesas)</div>
+          <div class="valor">R$ <%= Number(saldoLiquido).toFixed(2) %></div>
         </div>
         <div class="card">
           <div class="rotulo">Descontos concedidos</div>
@@ -101,17 +109,25 @@
       </div>
 
       <div class="painel">
-        <div class="painel-titulo">Por forma de pagamento — quanto entrou em cada uma</div>
+        <div class="painel-titulo">Por forma de pagamento — saldo de cada uma (vendas − despesas)</div>
+        <p class="texto-suave painel-subtitulo" style="padding-bottom:10px;">Cada despesa é descontada na forma de pagamento em que o dinheiro saiu. Veja o detalhe de cada despesa em <a href="/despesas">Despesas</a>.</p>
         <div class="grade-formas-pagamento">
           <% formasParaMostrar.forEach(function(forma) { %>
             <% var dados = mapaFormas[forma] || { total_vendas: 0, total_valor: 0 }; %>
+            <% var despesa = (forma !== 'fiado' && mapaDespesasPorForma[forma]) || { total_despesas: 0, total_valor: 0 }; %>
+            <% var saldoForma = Number(dados.total_valor) - Number(despesa.total_valor); %>
             <div class="card-forma-pagamento forma-<%= forma %>">
               <div class="icone-forma-pagamento">
                 <% if (forma === 'pix') { %><img src="/img/pix.svg" alt="Pix" style="width:22px; height:22px; vertical-align:middle;"><% } else { %><%= iconesFormaPagamento[forma] %><% } %>
               </div>
               <div class="nome-forma-pagamento"><%= nomesFormaPagamento[forma] %></div>
-              <div class="valor-forma-pagamento">R$ <%= Number(dados.total_valor).toFixed(2) %></div>
-              <div class="qtd-forma-pagamento"><%= dados.total_vendas %> venda<%= dados.total_vendas === 1 ? '' : 's' %></div>
+              <div class="valor-forma-pagamento">R$ <%= saldoForma.toFixed(2) %></div>
+              <div class="qtd-forma-pagamento">
+                <%= dados.total_vendas %> venda<%= dados.total_vendas === 1 ? '' : 's' %>
+                <% if (forma !== 'fiado') { %>
+                  <br>Entrou R$ <%= Number(dados.total_valor).toFixed(2) %> · Saiu R$ <%= Number(despesa.total_valor).toFixed(2) %>
+                <% } %>
+              </div>
             </div>
           <% }) %>
         </div>

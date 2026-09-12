@@ -204,6 +204,7 @@ a { color: inherit; text-decoration: none; }
 
 .card.destaque-chama .valor { color: var(--chama-escura); }
 .card.destaque-verde .valor { color: var(--verde-ok); }
+.card.destaque-vermelho .valor { color: var(--alerta); }
 
 /* ---- Tabelas ---- */
 .painel {

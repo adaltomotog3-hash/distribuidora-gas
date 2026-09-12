@@ -1,0 +1,145 @@
+<%
+  var nomesFormaPagamento = { dinheiro: 'Dinheiro', pix: 'Pix', cartao: 'Cartão' };
+  var iconesFormaPagamento = { dinheiro: '💵', pix: '📱', cartao: '💳' };
+%>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <%- include('partials/head', { titulo: 'Despesas' }) %>
+</head>
+<body>
+  <div class="app">
+    <%- include('partials/sidebar', { paginaAtual: 'despesas' }) %>
+
+    <div class="conteudo">
+
+      <%- include('partials/flash') %>
+      <div class="topo-pagina">
+        <div>
+          <h1>Despesas</h1>
+          <p>Registre tudo que saiu de dinheiro — o valor é descontado na hora do saldo da forma de pagamento usada</p>
+        </div>
+      </div>
+
+      <div class="painel">
+        <div class="painel-titulo">Registrar despesa</div>
+        <form method="POST" action="/despesas" class="form-grade" style="padding:20px;">
+          <div>
+            <label>Descrição</label>
+            <input type="text" name="descricao" placeholder="Ex: Compra de material de limpeza" required>
+          </div>
+          <div>
+            <label>Valor</label>
+            <input type="text" inputmode="decimal" name="valor" placeholder="0,00" required>
+          </div>
+          <div>
+            <label>De onde saiu o dinheiro</label>
+            <select name="forma_pagamento" required>
+              <option value="" disabled selected>Selecione...</option>
+              <option value="dinheiro">💵 Dinheiro</option>
+              <option value="pix">📱 Pix</option>
+              <option value="cartao">💳 Cartão</option>
+            </select>
+          </div>
+          <div>
+            <label>Para onde foi / pra quem foi pago</label>
+            <input type="text" name="destino" placeholder="Ex: Posto Ipiranga, Fornecedor João">
+          </div>
+          <div>
+            <label>Motivo</label>
+            <input type="text" name="motivo" placeholder="Ex: Combustível, manutenção, produto de limpeza">
+          </div>
+          <div class="form-acoes">
+            <button class="botao" type="submit">Registrar despesa</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="painel">
+        <form method="GET" action="/despesas" class="form-grade">
+          <div>
+            <label>De</label>
+            <input type="date" name="inicio" value="<%= dataInicio %>">
+          </div>
+          <div>
+            <label>Até</label>
+            <input type="date" name="fim" value="<%= dataFim %>">
+          </div>
+          <div class="form-acoes">
+            <button class="botao" type="submit">Filtrar período</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="grade-cards">
+        <div class="card destaque-vermelho">
+          <div class="rotulo">Total de despesas no período</div>
+          <div class="valor">R$ <%= Number(totalPeriodo).toFixed(2) %></div>
+        </div>
+        <div class="card">
+          <div class="rotulo">Qtd. de despesas</div>
+          <div class="valor"><%= despesas.length %></div>
+        </div>
+      </div>
+
+      <div class="painel">
+        <div class="painel-titulo">Despesas do período (<%= despesas.length %>)</div>
+        <% if (despesas.length === 0) { %>
+          <div class="vazio-lista">Nenhuma despesa registrada nesse período.</div>
+        <% } else { %>
+          <div class="painel-tabela-rolagem">
+          <table>
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Descrição</th>
+                <th>Para onde foi</th>
+                <th>Motivo</th>
+                <th>Saiu de</th>
+                <th>Valor</th>
+                <th>Lançado por</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% despesas.forEach(function(d) { %>
+                <tr>
+                  <td class="texto-suave"><%= new Date(d.criado_em).toLocaleString('pt-BR') %></td>
+                  <td><%= d.descricao %></td>
+                  <td class="texto-suave"><%= d.destino || '—' %></td>
+                  <td class="texto-suave"><%= d.motivo || '—' %></td>
+                  <td>
+                    <%= iconesFormaPagamento[d.forma_pagamento] || '' %>
+                    <%= nomesFormaPagamento[d.forma_pagamento] || d.forma_pagamento %>
+                  </td>
+                  <td><strong>R$ <%= Number(d.valor).toFixed(2) %></strong></td>
+                  <td class="texto-suave"><%= d.registrado_por || '—' %></td>
+                  <td>
+                    <form method="POST" action="/despesas/<%= d.id %>/excluir" class="excluir-despesa-form">
+                      <button class="botao botao-perigo botao-pequeno" type="submit">Excluir</button>
+                    </form>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+          </div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.querySelectorAll('.excluir-despesa-form').forEach(function (form) {
+      form.addEventListener('submit', function (e) {
+        if (form.dataset.enviando) return;
+        if (!confirm('Excluir essa despesa? Essa ação não pode ser desfeita.')) {
+          e.preventDefault();
+          return;
+        }
+        form.dataset.enviando = '1';
+      });
+    });
+  </script>
+</body>
+</html>

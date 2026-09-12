@@ -33,6 +33,7 @@
         <a class="aba-relatorio <%= tipo === 'vendas' ? 'ativa' : '' %>" href="/relatorios?tipo=vendas&periodo=<%= periodo %>">📦 Relatório de Vendas</a>
         <a class="aba-relatorio <%= tipo === 'financeiro' ? 'ativa' : '' %>" href="/relatorios?tipo=financeiro&periodo=<%= periodo %>">💰 Relatório Financeiro</a>
         <a class="aba-relatorio <%= tipo === 'entregas' ? 'ativa' : '' %>" href="/relatorios?tipo=entregas&periodo=<%= periodo %>">🛵 Relatório de Entregas</a>
+        <a class="aba-relatorio <%= tipo === 'saidas' ? 'ativa' : '' %>" href="/relatorios?tipo=saidas&periodo=<%= periodo %>">💸 Relatório de Saídas</a>
       </div>
 
       <div class="abas-relatorio">
@@ -53,6 +54,15 @@
             </div>
             <div class="card destaque-verde">
               <div class="rotulo">Valor entregue</div>
+              <div class="valor">R$ <%= Number(atual.valor_total).toFixed(2) %></div>
+            </div>
+          <% } else if (tipo === 'saidas') { %>
+            <div class="card">
+              <div class="rotulo">Despesas</div>
+              <div class="valor"><%= atual.total_despesas %></div>
+            </div>
+            <div class="card destaque-vermelho">
+              <div class="rotulo">Valor gasto</div>
               <div class="valor">R$ <%= Number(atual.valor_total).toFixed(2) %></div>
             </div>
           <% } else { %>
@@ -89,10 +99,12 @@
 
       <div class="painel">
         <div class="painel-titulo">
-          <%= tipo === 'vendas' ? 'Vendas por período' : (tipo === 'financeiro' ? 'Financeiro por período' : 'Entregas por período') %>
+          <%= tipo === 'vendas' ? 'Vendas por período' : (tipo === 'financeiro' ? 'Financeiro por período' : (tipo === 'saidas' ? 'Saídas por período' : 'Entregas por período')) %>
         </div>
         <% if (linhas.length === 0) { %>
-          <div class="vazio-lista">Ainda não há pedidos <%= tipo === 'entregas' ? 'entregues' : 'fechados' %> suficientes pra montar esse relatório.</div>
+          <div class="vazio-lista">
+            <% if (tipo === 'saidas') { %>Ainda não há despesas suficientes pra montar esse relatório.<% } else { %>Ainda não há pedidos <%= tipo === 'entregas' ? 'entregues' : 'fechados' %> suficientes pra montar esse relatório.<% } %>
+          </div>
         <% } else { %>
           <table>
             <thead>
@@ -112,6 +124,12 @@
                   <th>Valor Água</th>
                   <th>Descontos</th>
                   <th>Valor Total</th>
+                </tr>
+              <% } else if (tipo === 'saidas') { %>
+                <tr>
+                  <th>Período</th>
+                  <th>Despesas</th>
+                  <th>Valor gasto</th>
                 </tr>
               <% } else { %>
                 <tr>
@@ -136,6 +154,9 @@
                     <td>R$ <%= Number(l.valor_agua).toFixed(2) %></td>
                     <td class="texto-suave">R$ <%= Number(l.total_descontos).toFixed(2) %></td>
                     <td><strong>R$ <%= Number(l.valor_total).toFixed(2) %></strong></td>
+                  <% } else if (tipo === 'saidas') { %>
+                    <td><%= l.total_despesas %></td>
+                    <td><strong>R$ <%= Number(l.valor_total).toFixed(2) %></strong></td>
                   <% } else { %>
                     <td><%= l.total_entregas %></td>
                     <td>R$ <%= Number(l.valor_total).toFixed(2) %></td>
@@ -149,7 +170,7 @@
 
       <p class="texto-suave" style="font-size:12.5px;">
         Os cards acima mostram só <%= rotuloAtual.toLowerCase() %>. A tabela acima mostra o histórico dos últimos períodos (por exemplo, os últimos 30 dias no diário, ou os últimos 12 meses no mensal).
-        <% if (tipo !== 'entregas') { %>Pra ver um intervalo de datas específico com mais detalhe (forma de pagamento, tipo de item), use a página <a href="/financeiro">Financeiro</a>.<% } %>
+        <% if (tipo !== 'entregas' && tipo !== 'saidas') { %>Pra ver um intervalo de datas específico com mais detalhe (forma de pagamento, tipo de item), use a página <a href="/financeiro">Financeiro</a>.<% } %>
       </p>
 
       <% if (tipo === 'entregas') { %>
@@ -226,6 +247,85 @@
                         <span class="selo selo-aguardando">Pendente</span>
                       <% } %>
                     </td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+            </div>
+          <% } %>
+        </div>
+      <% } %>
+
+      <% if (tipo === 'saidas') { %>
+        <div class="painel">
+          <div class="painel-titulo">Busca detalhada por intervalo de datas</div>
+          <form method="GET" action="/relatorios" class="form-grade">
+            <input type="hidden" name="tipo" value="saidas">
+            <input type="hidden" name="periodo" value="<%= periodo %>">
+            <div>
+              <label>De</label>
+              <input type="date" name="inicio" value="<%= inicio %>">
+            </div>
+            <div>
+              <label>Até</label>
+              <input type="date" name="fim" value="<%= fim %>">
+            </div>
+            <div class="form-acoes">
+              <button class="botao" type="submit">Filtrar período</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="painel">
+          <div class="painel-titulo">Por forma de pagamento — de onde saiu o dinheiro (no intervalo de datas acima)</div>
+          <% if (porForma.length === 0) { %>
+            <div class="vazio-lista">Nenhuma despesa nesse período.</div>
+          <% } else { %>
+            <table>
+              <thead><tr><th>Forma de pagamento</th><th>Despesas</th><th>Valor</th></tr></thead>
+              <tbody>
+                <% var nomesFormaPagamento = { dinheiro: 'Dinheiro', pix: 'Pix', cartao: 'Cartão' }; %>
+                <% porForma.forEach(function(f) { %>
+                  <tr>
+                    <td><%= nomesFormaPagamento[f.forma_pagamento] || f.forma_pagamento %></td>
+                    <td><%= f.total_despesas %></td>
+                    <td>R$ <%= Number(f.valor_total).toFixed(2) %></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          <% } %>
+        </div>
+
+        <div class="painel">
+          <div class="painel-titulo">Detalhe das despesas (<%= detalhe.length %>)</div>
+          <% if (detalhe.length === 0) { %>
+            <div class="vazio-lista">Nenhuma despesa nesse período.</div>
+          <% } else { %>
+            <div class="painel-tabela-rolagem">
+            <table>
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Descrição</th>
+                  <th>Para onde foi</th>
+                  <th>Motivo</th>
+                  <th>Saiu de</th>
+                  <th>Valor</th>
+                  <th>Lançado por</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% var nomesFormaPagamento2 = { dinheiro: 'Dinheiro', pix: 'Pix', cartao: 'Cartão' }; %>
+                <% detalhe.forEach(function(d) { %>
+                  <tr>
+                    <td class="texto-suave"><%= new Date(d.criado_em).toLocaleString('pt-BR') %></td>
+                    <td><%= d.descricao %></td>
+                    <td class="texto-suave"><%= d.destino || '—' %></td>
+                    <td class="texto-suave"><%= d.motivo || '—' %></td>
+                    <td><%= nomesFormaPagamento2[d.forma_pagamento] || d.forma_pagamento %></td>
+                    <td><strong>R$ <%= Number(d.valor).toFixed(2) %></strong></td>
+                    <td class="texto-suave"><%= d.registrado_por || '—' %></td>
                   </tr>
                 <% }) %>
               </tbody>
