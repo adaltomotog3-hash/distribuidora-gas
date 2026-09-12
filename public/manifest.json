@@ -1,0 +1,15 @@
+{
+  "name": "Lorin Gás e Água",
+  "short_name": "Lorin Gás e Água",
+  "description": "Sistema de gestão da Lorin Gás e Água — pedidos, entregas, estoque e financeiro",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1B2430",
+  "theme_color": "#1B2430",
+  "icons": [
+    { "src": "/img/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/img/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/img/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/img/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

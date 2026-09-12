@@ -33,8 +33,12 @@ router.post('/api/login', protegerLogin, async (req, res) => {
   }
 
   req.loginLimiter.sucesso();
+  // "criadoEm" vai junto no token pra identificar esse entregador específico,
+  // não só o número do ID — se o ID for reaproveitado depois (entregador
+  // excluído e outro criado no lugar), o "criado_em" muda e esse token antigo
+  // deixa de valer pro entregador novo. Ver checagem em middleware/apiAuth.js.
   const token = jwt.sign(
-    { entregadorId: entregador.id, nome: entregador.nome },
+    { entregadorId: entregador.id, nome: entregador.nome, criadoEm: entregador.criado_em.toISOString() },
     JWT_SECRET,
     { expiresIn: '30d' }
   );
