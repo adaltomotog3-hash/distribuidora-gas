@@ -40,8 +40,8 @@
 
     if (!_mapaEndereco) {
       _mapaEndereco = L.map('modal-mapa').setView([-14.235, -51.925], 4);
-      L.tileLayer('', {
-        attribution: '&copy; OpenStreetMap &copy; CARTO &copy; CARTO',
+      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+        attribution: '&copy; Esri',
         maxZoom: 19
       }).addTo(_mapaEndereco);
       _mapaEndereco.on('click', function (e) {
@@ -64,45 +64,3 @@
     }
 
     // Sem coordenada salva ainda: tenta centralizar pelo endereço digitado
-    const endereco = [
-      _campoEndereco('campo-endereco').value,
-      _campoEndereco('campo-numero').value,
-      _campoEndereco('campo-bairro').value,
-      _campoEndereco('campo-cidade').value,
-      _campoEndereco('campo-uf').value
-    ].filter(Boolean).join(', ');
-
-    if (endereco) {
-      try {
-        const resp = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(endereco));
-        const resultado = await resp.json();
-        if (resultado && resultado[0]) {
-          _mapaEndereco.setView([Number(resultado[0].lat), Number(resultado[0].lon)], 16);
-        }
-      } catch (err) {
-        // Sem internet pro geocode ou API fora do ar — sem problema, o usuário
-        // pode navegar manualmente no mapa e clicar no ponto certo.
-      }
-    }
-  }
-
-  function fecharMapaEndereco() {
-    document.getElementById('modal-mapa-endereco').classList.remove('aberto');
-  }
-
-  async function buscarCep() {
-    const cepDigitado = _campoEndereco('campo-cep').value.replace(/\D/g, '');
-    if (cepDigitado.length !== 8) return;
-    try {
-      const resp = await fetch('https://viacep.com.br/ws/' + cepDigitado + '/json/');
-      const dados = await resp.json();
-      if (dados.erro) return;
-      if (dados.logradouro) _campoEndereco('campo-endereco').value = dados.logradouro;
-      if (dados.bairro) _campoEndereco('campo-bairro').value = dados.bairro;
-      if (dados.localidade) _campoEndereco('campo-cidade').value = dados.localidade;
-      if (dados.uf) _campoEndereco('campo-uf').value = dados.uf;
-    } catch (err) {
-      // Sem internet ou API fora do ar — o atendente preenche na mão mesmo.
-    }
-  }
-</script>
