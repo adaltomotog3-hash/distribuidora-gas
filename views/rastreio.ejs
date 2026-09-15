@@ -47,8 +47,8 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
     const mapa = L.map('mapa').setView([-14.235, -51.925], 4); // centro do Brasil, até ter posição real
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap',
+    L.tileLayer('', {
+      attribution: '&copy; OpenStreetMap &copy; CARTO &copy; CARTO',
       maxZoom: 19
     }).addTo(mapa);
 

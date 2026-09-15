@@ -40,8 +40,8 @@
 
     if (!_mapaEndereco) {
       _mapaEndereco = L.map('modal-mapa').setView([-14.235, -51.925], 4);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap',
+      L.tileLayer('', {
+        attribution: '&copy; OpenStreetMap &copy; CARTO &copy; CARTO',
         maxZoom: 19
       }).addTo(_mapaEndereco);
       _mapaEndereco.on('click', function (e) {
