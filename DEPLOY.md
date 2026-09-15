@@ -70,9 +70,10 @@ chmod +x scripts/backup-diario.sh
 crontab -e
 ```
 
-E adicione a linha (roda todo dia às 3h da manhã):
+E adicione a linha (roda todo dia às 3h da manhã — o `PASTA_UPLOADS` faz o backup
+levar junto os comprovantes anexados em Despesas, não só o banco):
 ```
-0 3 * * * DATABASE_URL="sua_database_url_aqui" /caminho/completo/para/distribuidora-gas/scripts/backup-diario.sh >> /caminho/completo/para/distribuidora-gas/backup.log 2>&1
+0 3 * * * DATABASE_URL="sua_database_url_aqui" PASTA_UPLOADS="/caminho/completo/para/distribuidora-gas/uploads" /caminho/completo/para/distribuidora-gas/scripts/backup-diario.sh >> /caminho/completo/para/distribuidora-gas/backup.log 2>&1
 ```
 
 ### Se o sistema já está rodando nesse servidor (é só atualizar)

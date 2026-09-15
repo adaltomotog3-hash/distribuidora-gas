@@ -27,39 +27,40 @@ router.get('/os', async (req, res) => {
     LEFT JOIN clientes c ON c.id = p.cliente_id
     LEFT JOIN entregadores e ON e.id = p.entregador_id`;
 
-  const abertasResult = await pool.query(
-    `SELECT ${camposComuns}
-     WHERE p.status = 'fechado' AND p.entrega_status = 'pendente' ${filtroProduto}
-     ORDER BY p.fechado_em ASC`,
-    params
-  );
-
-  const aguardandoBaixaResult = await pool.query(
-    `SELECT ${camposComuns}
-     WHERE p.status = 'fechado' AND p.entrega_status = 'entregue' AND p.baixado_em IS NULL ${filtroProduto}
-     ORDER BY p.entregue_em ASC`,
-    params
-  );
-
-  const baixadasResult = await pool.query(
-    `SELECT ${camposComuns}
-     WHERE p.status = 'fechado' AND p.entrega_status = 'entregue' AND p.baixado_em IS NOT NULL ${filtroProduto}
-     ORDER BY p.baixado_em DESC
-     LIMIT 200`,
-    params
-  );
-
-  const canceladasResult = await pool.query(
-    `SELECT ${camposComuns}
-     WHERE p.status = 'cancelado' ${filtroProduto}
-     ORDER BY p.cancelado_em DESC
-     LIMIT 100`,
-    params
-  );
-
-  const entregadoresResult = await pool.query(
-    `SELECT id, nome FROM entregadores WHERE ativo = TRUE ORDER BY nome ASC`
-  );
+  // As 5 abas (Abertas, Aguardando baixa, Baixadas, Canceladas, Entregadores)
+  // são consultas independentes — rodando juntas com Promise.all em vez de
+  // uma esperar a outra, a página inteira carrega bem mais rápido.
+  const [abertasResult, aguardandoBaixaResult, baixadasResult, canceladasResult, entregadoresResult] = await Promise.all([
+    pool.query(
+      `SELECT ${camposComuns}
+       WHERE p.status = 'fechado' AND p.entrega_status = 'pendente' ${filtroProduto}
+       ORDER BY p.fechado_em ASC`,
+      params
+    ),
+    pool.query(
+      `SELECT ${camposComuns}
+       WHERE p.status = 'fechado' AND p.entrega_status = 'entregue' AND p.baixado_em IS NULL ${filtroProduto}
+       ORDER BY p.entregue_em ASC`,
+      params
+    ),
+    pool.query(
+      `SELECT ${camposComuns}
+       WHERE p.status = 'fechado' AND p.entrega_status = 'entregue' AND p.baixado_em IS NOT NULL ${filtroProduto}
+       ORDER BY p.baixado_em DESC
+       LIMIT 200`,
+      params
+    ),
+    pool.query(
+      `SELECT ${camposComuns}
+       WHERE p.status = 'cancelado' ${filtroProduto}
+       ORDER BY p.cancelado_em DESC
+       LIMIT 100`,
+      params
+    ),
+    pool.query(
+      `SELECT id, nome FROM entregadores WHERE ativo = TRUE ORDER BY nome ASC`
+    )
+  ]);
 
   const preparar = (row) => ({
     ...row,

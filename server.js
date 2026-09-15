@@ -3,6 +3,7 @@ const express = require('express');
 require('express-async-errors'); // faz erros de rotas async caírem no error handler abaixo, em vez de travar o processo
 const session = require('express-session');
 const helmet = require('helmet');
+const compression = require('compression');
 const path = require('path');
 
 const initDb = require('./db/init');
@@ -37,9 +38,21 @@ app.set('trust proxy', 1);
 // estilos/scripts inline nas páginas e carrega o mapa (Leaflet) de um CDN.
 app.use(helmet({ contentSecurityPolicy: false }));
 
+// Compacta (gzip) o HTML/CSS/JS/JSON de cada resposta antes de mandar pro
+// navegador — deixa a navegação mais rápida principalmente em conexões mais
+// lentas (o túnel Cloudflare / internet do cliente), sem mudar nada no
+// código das páginas.
+app.use(compression());
+
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), {
+  // CSS, imagens e ícones praticamente não mudam — manda o navegador guardar
+  // em cache por 7 dias, assim ele para de rebaixar esses arquivos de novo a
+  // cada página visitada. Se um dia precisar forçar atualização de algum
+  // arquivo estático, basta renomeá-lo (ex: style.css -> style.v2.css).
+  maxAge: '7d'
+}));
 
 app.use(session({
   secret: process.env.SESSION_SECRET || 'segredo-troque-isso',

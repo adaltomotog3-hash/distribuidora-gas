@@ -170,29 +170,160 @@
 
       <p class="texto-suave" style="font-size:12.5px;">
         Os cards acima mostram só <%= rotuloAtual.toLowerCase() %>. A tabela acima mostra o histórico dos últimos períodos (por exemplo, os últimos 30 dias no diário, ou os últimos 12 meses no mensal).
-        <% if (tipo !== 'entregas' && tipo !== 'saidas') { %>Pra ver um intervalo de datas específico com mais detalhe (forma de pagamento, tipo de item), use a página <a href="/financeiro">Financeiro</a>.<% } %>
+        Pra ver um intervalo de datas específico com todo o detalhe (e baixar em PDF), use o painel abaixo.
       </p>
 
-      <% if (tipo === 'entregas') { %>
+      <div class="painel">
+        <div class="painel-titulo">Busca detalhada por intervalo de datas</div>
+        <form method="GET" action="/relatorios" class="form-grade">
+          <input type="hidden" name="tipo" value="<%= tipo %>">
+          <input type="hidden" name="periodo" value="<%= periodo %>">
+          <div>
+            <label>De</label>
+            <input type="date" name="inicio" value="<%= inicio %>">
+          </div>
+          <div>
+            <label>Até</label>
+            <input type="date" name="fim" value="<%= fim %>">
+          </div>
+          <div class="form-acoes" style="gap:8px; display:flex; flex-wrap:wrap;">
+            <button class="botao" type="submit">Filtrar período</button>
+            <a class="botao botao-secundario" href="/relatorios/pdf/<%= tipo %>?inicio=<%= inicio %>&fim=<%= fim %>" target="_blank">📄 Baixar PDF detalhado</a>
+          </div>
+        </form>
+      </div>
+
+      <% if (tipo === 'vendas') { %>
         <div class="painel">
-          <div class="painel-titulo">Busca detalhada por intervalo de datas</div>
-          <form method="GET" action="/relatorios" class="form-grade">
-            <input type="hidden" name="tipo" value="entregas">
-            <input type="hidden" name="periodo" value="<%= periodo %>">
-            <div>
-              <label>De</label>
-              <input type="date" name="inicio" value="<%= inicio %>">
+          <div class="painel-titulo">Detalhe das O.S. no intervalo acima (<%= detalheVendas.length %>)</div>
+          <% if (detalheVendas.length === 0) { %>
+            <div class="vazio-lista">Nenhuma O.S. fechada nesse período.</div>
+          <% } else { %>
+            <div class="painel-tabela-rolagem">
+            <table>
+              <thead>
+                <tr>
+                  <th>O.S.</th>
+                  <th>Data</th>
+                  <th>Cliente</th>
+                  <th>Itens</th>
+                  <th>Pagamento</th>
+                  <th>Desconto</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% detalheVendas.forEach(function(d) { %>
+                  <tr>
+                    <td><a href="/pedidos/<%= d.id %>"><span class="selo-os">Nº <%= d.id %></span></a></td>
+                    <td class="texto-suave"><%= new Date(d.fechado_em).toLocaleString('pt-BR') %></td>
+                    <td><%= d.cliente_nome %></td>
+                    <td class="texto-suave"><%= d.resumo_itens || '—' %></td>
+                    <td class="texto-suave"><%= d.forma_pagamento || '—' %></td>
+                    <td class="texto-suave">R$ <%= Number(d.desconto).toFixed(2) %></td>
+                    <td><strong>R$ <%= Number(d.total_valor).toFixed(2) %></strong></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
             </div>
-            <div>
-              <label>Até</label>
-              <input type="date" name="fim" value="<%= fim %>">
-            </div>
-            <div class="form-acoes">
-              <button class="botao" type="submit">Filtrar período</button>
-            </div>
-          </form>
+          <% } %>
+        </div>
+      <% } %>
+
+      <% if (tipo === 'financeiro') { %>
+        <div class="grade-cards">
+          <div class="card destaque-verde">
+            <div class="rotulo">Entrou no período</div>
+            <div class="valor">R$ <%= porFormaFinanceiro.reduce(function(s, f) { return s + Number(f.total_valor); }, 0).toFixed(2) %></div>
+          </div>
+          <div class="card destaque-vermelho">
+            <div class="rotulo">Saiu no período (despesas)</div>
+            <div class="valor">R$ <%= Number(totalDespesasFinanceiro).toFixed(2) %></div>
+          </div>
+          <div class="card">
+            <div class="rotulo">Saldo líquido</div>
+            <div class="valor">R$ <%= Number(saldoLiquidoFinanceiro).toFixed(2) %></div>
+          </div>
         </div>
 
+        <div class="painel">
+          <div class="painel-titulo">Entradas por forma de pagamento (no intervalo acima)</div>
+          <% if (porFormaFinanceiro.length === 0) { %>
+            <div class="vazio-lista">Nenhuma venda nesse período.</div>
+          <% } else { %>
+            <table>
+              <thead><tr><th>Forma</th><th>Vendas</th><th>Valor</th></tr></thead>
+              <tbody>
+                <% var nomesFormaPagamento3 = { dinheiro: 'Dinheiro', pix: 'Pix', cartao: 'Cartão', fiado: 'Fiado' }; %>
+                <% porFormaFinanceiro.forEach(function(f) { %>
+                  <tr>
+                    <td><%= nomesFormaPagamento3[f.forma_pagamento] || f.forma_pagamento %></td>
+                    <td><%= f.total_vendas %></td>
+                    <td>R$ <%= Number(f.total_valor).toFixed(2) %></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          <% } %>
+        </div>
+
+        <div class="painel">
+          <div class="painel-titulo">Saídas por forma de pagamento (no intervalo acima)</div>
+          <% if (despesasPorFormaFinanceiro.length === 0) { %>
+            <div class="vazio-lista">Nenhuma despesa nesse período.</div>
+          <% } else { %>
+            <table>
+              <thead><tr><th>Forma</th><th>Despesas</th><th>Valor</th></tr></thead>
+              <tbody>
+                <% despesasPorFormaFinanceiro.forEach(function(f) { %>
+                  <tr>
+                    <td><%= nomesFormaPagamento3[f.forma_pagamento] || f.forma_pagamento %></td>
+                    <td><%= f.total_despesas %></td>
+                    <td>R$ <%= Number(f.total_valor).toFixed(2) %></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          <% } %>
+        </div>
+
+        <div class="painel">
+          <div class="painel-titulo">Detalhe das vendas no intervalo acima (<%= detalheVendas.length %>)</div>
+          <% if (detalheVendas.length === 0) { %>
+            <div class="vazio-lista">Nenhuma O.S. fechada nesse período.</div>
+          <% } else { %>
+            <div class="painel-tabela-rolagem">
+            <table>
+              <thead>
+                <tr>
+                  <th>O.S.</th>
+                  <th>Data</th>
+                  <th>Cliente</th>
+                  <th>Pagamento</th>
+                  <th>Desconto</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% detalheVendas.forEach(function(d) { %>
+                  <tr>
+                    <td><a href="/pedidos/<%= d.id %>"><span class="selo-os">Nº <%= d.id %></span></a></td>
+                    <td class="texto-suave"><%= new Date(d.fechado_em).toLocaleString('pt-BR') %></td>
+                    <td><%= d.cliente_nome %></td>
+                    <td class="texto-suave"><%= d.forma_pagamento || '—' %></td>
+                    <td class="texto-suave">R$ <%= Number(d.desconto).toFixed(2) %></td>
+                    <td><strong>R$ <%= Number(d.total_valor).toFixed(2) %></strong></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+            </div>
+          <% } %>
+        </div>
+      <% } %>
+
+      <% if (tipo === 'entregas') { %>
         <div class="painel">
           <div class="painel-titulo">Quem entregou — por entregador (no intervalo de datas acima)</div>
           <% if (porEntregador.length === 0) { %>
@@ -257,25 +388,6 @@
       <% } %>
 
       <% if (tipo === 'saidas') { %>
-        <div class="painel">
-          <div class="painel-titulo">Busca detalhada por intervalo de datas</div>
-          <form method="GET" action="/relatorios" class="form-grade">
-            <input type="hidden" name="tipo" value="saidas">
-            <input type="hidden" name="periodo" value="<%= periodo %>">
-            <div>
-              <label>De</label>
-              <input type="date" name="inicio" value="<%= inicio %>">
-            </div>
-            <div>
-              <label>Até</label>
-              <input type="date" name="fim" value="<%= fim %>">
-            </div>
-            <div class="form-acoes">
-              <button class="botao" type="submit">Filtrar período</button>
-            </div>
-          </form>
-        </div>
-
         <div class="painel">
           <div class="painel-titulo">Por forma de pagamento — de onde saiu o dinheiro (no intervalo de datas acima)</div>
           <% if (porForma.length === 0) { %>

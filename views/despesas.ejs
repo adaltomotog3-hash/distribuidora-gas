@@ -23,7 +23,7 @@
 
       <div class="painel">
         <div class="painel-titulo">Registrar despesa</div>
-        <form method="POST" action="/despesas" class="form-grade" style="padding:20px;">
+        <form method="POST" action="/despesas" class="form-grade" enctype="multipart/form-data" style="padding:20px;">
           <div>
             <label>Descrição</label>
             <input type="text" name="descricao" placeholder="Ex: Compra de material de limpeza" required>
@@ -48,6 +48,11 @@
           <div>
             <label>Motivo</label>
             <input type="text" name="motivo" placeholder="Ex: Combustível, manutenção, produto de limpeza">
+          </div>
+          <div>
+            <label>Comprovante (foto ou PDF)</label>
+            <input type="file" name="comprovantes" accept="image/*,application/pdf" multiple>
+            <p class="texto-suave" style="font-size:11.5px; margin-top:4px;">Pode anexar mais de um arquivo (até 5, 10MB cada).</p>
           </div>
           <div class="form-acoes">
             <button class="botao" type="submit">Registrar despesa</button>
@@ -98,6 +103,7 @@
                 <th>Saiu de</th>
                 <th>Valor</th>
                 <th>Lançado por</th>
+                <th>Comprovante</th>
                 <th></th>
               </tr>
             </thead>
@@ -114,6 +120,22 @@
                   </td>
                   <td><strong>R$ <%= Number(d.valor).toFixed(2) %></strong></td>
                   <td class="texto-suave"><%= d.registrado_por || '—' %></td>
+                  <td>
+                    <% if (d.comprovantes.length === 0) { %>
+                      <span class="texto-suave">—</span>
+                    <% } else { %>
+                      <div style="display:flex; flex-direction:column; gap:4px;">
+                        <% d.comprovantes.forEach(function(c, indice) { %>
+                          <div style="display:flex; align-items:center; gap:6px;">
+                            <a href="/despesas/comprovantes/<%= c.id %>" target="_blank">📎 Comprovante <%= indice + 1 %></a>
+                            <form method="POST" action="/despesas/comprovantes/<%= c.id %>/excluir" class="excluir-comprovante-form">
+                              <button class="botao-perigo botao-pequeno" type="submit" style="border:none; background:transparent; padding:0 4px;">✕</button>
+                            </form>
+                          </div>
+                        <% }) %>
+                      </div>
+                    <% } %>
+                  </td>
                   <td>
                     <form method="POST" action="/despesas/<%= d.id %>/excluir" class="excluir-despesa-form">
                       <button class="botao botao-perigo botao-pequeno" type="submit">Excluir</button>
@@ -134,6 +156,17 @@
       form.addEventListener('submit', function (e) {
         if (form.dataset.enviando) return;
         if (!confirm('Excluir essa despesa? Essa ação não pode ser desfeita.')) {
+          e.preventDefault();
+          return;
+        }
+        form.dataset.enviando = '1';
+      });
+    });
+
+    document.querySelectorAll('.excluir-comprovante-form').forEach(function (form) {
+      form.addEventListener('submit', function (e) {
+        if (form.dataset.enviando) return;
+        if (!confirm('Remover esse comprovante?')) {
           e.preventDefault();
           return;
         }

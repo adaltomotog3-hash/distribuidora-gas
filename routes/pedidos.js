@@ -1,6 +1,7 @@
 const express = require('express');
 const pool = require('../db/pool');
 const { formatarEndereco } = require('../lib/endereco');
+const { notificarNovaEntrega } = require('../lib/pushNotifications');
 
 const router = express.Router();
 
@@ -85,28 +86,30 @@ router.post('/pedidos', async (req, res) => {
 
 // --- Tela de um carrinho específico ---
 router.get('/pedidos/:id', async (req, res) => {
-  const pedidoResult = await pool.query(
-    `SELECT p.*, c.nome AS cliente_nome, c.telefone AS cliente_telefone, e.nome AS entregador_nome,
-       c.endereco, c.numero, c.complemento, c.bairro, c.cidade, c.uf, c.referencia,
-       c.latitude AS cliente_latitude, c.longitude AS cliente_longitude
-     FROM pedidos p
-     LEFT JOIN clientes c ON c.id = p.cliente_id
-     LEFT JOIN entregadores e ON e.id = p.entregador_id
-     WHERE p.id = $1`,
-    [req.params.id]
-  );
+  // Nenhuma dessas 4 consultas depende do resultado de outra (itens, produtos
+  // e entregadores não precisam saber nada do pedido além do próprio ID, que
+  // já vem da URL) — rodando junto em vez de uma esperar a outra, essa tela
+  // (a mais usada pra montar um pedido) abre bem mais rápido.
+  const [pedidoResult, itens, produtosResult, entregadoresResult] = await Promise.all([
+    pool.query(
+      `SELECT p.*, c.nome AS cliente_nome, c.telefone AS cliente_telefone, e.nome AS entregador_nome,
+         c.endereco, c.numero, c.complemento, c.bairro, c.cidade, c.uf, c.referencia,
+         c.latitude AS cliente_latitude, c.longitude AS cliente_longitude
+       FROM pedidos p
+       LEFT JOIN clientes c ON c.id = p.cliente_id
+       LEFT JOIN entregadores e ON e.id = p.entregador_id
+       WHERE p.id = $1`,
+      [req.params.id]
+    ),
+    buscarItensDoPedido(req.params.id),
+    pool.query(`SELECT * FROM produtos WHERE ativo = TRUE ORDER BY tipo ASC, nome ASC`),
+    pool.query(`SELECT id, nome FROM entregadores WHERE ativo = TRUE ORDER BY nome ASC`)
+  ]);
+
   const pedido = pedidoResult.rows[0];
   if (!pedido) return res.redirect('/pedidos');
 
   pedido.cliente_endereco = formatarEndereco(pedido);
-
-  const itens = await buscarItensDoPedido(pedido.id);
-  const produtosResult = await pool.query(
-    `SELECT * FROM produtos WHERE ativo = TRUE ORDER BY tipo ASC, nome ASC`
-  );
-  const entregadoresResult = await pool.query(
-    `SELECT id, nome FROM entregadores WHERE ativo = TRUE ORDER BY nome ASC`
-  );
 
   const total = itens.reduce((soma, i) => soma + Number(i.preco_unitario) * i.quantidade, 0);
   const desconto = Number(pedido.desconto) || 0;
@@ -247,6 +250,11 @@ router.post('/pedidos/:id/atribuir-entregador', async (req, res) => {
      WHERE id = $2 AND status = 'fechado'`,
     [entregadorId, req.params.id]
   );
+
+  if (entregadorId) {
+    await notificarNovaEntrega(entregadorId, req.params.id);
+  }
+
   req.setFlash('sucesso', entregadorId ? 'Entregador atribuído a essa O.S.' : 'Entregador removido — a O.S. volta a aparecer pra todos.');
   res.redirect(req.get('Referrer') || '/os');
 });
@@ -353,6 +361,10 @@ router.post('/pedidos/:id/fechar', async (req, res) => {
       'INSERT INTO movimentos_estoque (tipo, quantidade, observacao, produto, produto_id) VALUES ($1, $2, $3, $4, $5)',
       ['saida_cheio', item.quantidade, 'Pedido #' + pedido.id, item.produto, item.produto_id]
     );
+  }
+
+  if (entregador_id) {
+    await notificarNovaEntrega(entregador_id, pedido.id);
   }
 
   req.setFlash('sucesso', 'Pedido fechado — O.S. #' + pedido.id + ' gerada e enviada pro entregador.');

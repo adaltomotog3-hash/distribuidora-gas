@@ -87,6 +87,23 @@ router.get('/api/entregas', async (req, res) => {
   res.json({ entregas });
 });
 
+// --- Salva/atualiza o token de notificação push deste celular (chamado pelo ---
+// app assim que o entregador loga, pra poder receber a notificação sonora de
+// "nova entrega" quando uma O.S. for direcionada pra ele).
+router.post('/api/push-token', async (req, res) => {
+  const { expoPushToken } = req.body;
+  if (!expoPushToken) {
+    return res.status(400).json({ erro: 'Token de notificação é obrigatório.' });
+  }
+
+  await pool.query(
+    'UPDATE entregadores SET expo_push_token = $1 WHERE id = $2',
+    [expoPushToken, req.entregador.id]
+  );
+
+  res.json({ ok: true });
+});
+
 // --- Finaliza uma O.S. (pedido): marca como entregue e salva a localização do celular ---
 router.post('/api/entregas/:id/finalizar', async (req, res) => {
   const { latitude, longitude } = req.body;

@@ -156,6 +156,14 @@ async function initDb() {
     );
   `);
 
+  // --- MIGRAÇÃO: token de notificação push do app do entregador ---
+  // Salvo pelo app (POST /api/push-token) depois do login, em cada celular.
+  // Usado pra mandar a notificação sonora de "nova entrega" quando uma O.S.
+  // é direcionada pra esse entregador (ver lib/pushNotifications.js).
+  if (!(await columnExists('entregadores', 'expo_push_token'))) {
+    await pool.query(`ALTER TABLE entregadores ADD COLUMN expo_push_token TEXT`);
+  }
+
   // Cada venda passa a ser também a "O.S." de entrega: quem entregou, se já foi
   // entregue e onde (localização capturada no celular na hora de finalizar).
   const colunasEntrega = [
@@ -491,6 +499,52 @@ async function initDb() {
       registrado_por TEXT, -- usuário do painel que lançou a despesa
       criado_em TIMESTAMP DEFAULT NOW()
     );
+  `);
+
+  // --- MIGRAÇÃO: comprovantes anexados a cada despesa (foto/PDF do recibo) ---
+  // O arquivo em si fica salvo em disco (pasta uploads/comprovantes/, fora do
+  // Git — ver .gitignore); aqui só fica o registro de qual arquivo pertence a
+  // qual despesa. Uma despesa pode ter mais de um comprovante.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS despesas_comprovantes (
+      id SERIAL PRIMARY KEY,
+      despesa_id INT NOT NULL REFERENCES despesas(id) ON DELETE CASCADE,
+      nome_original TEXT NOT NULL,
+      nome_arquivo TEXT NOT NULL,
+      tipo_mime TEXT,
+      tamanho_bytes INT,
+      criado_em TIMESTAMP DEFAULT NOW()
+    );
+  `);
+
+  // --- Índices de performance ---
+  // O Postgres NÃO cria índice automático em coluna de chave estrangeira (só
+  // no lado que é chave primária/única) — sem esses índices, toda consulta
+  // que filtra ou junta por essas colunas faz uma varredura na tabela
+  // inteira, e isso vai piorando à medida que o histórico de pedidos/O.S.
+  // cresce (era a causa mais provável do sistema ficar "sempre lento" ao
+  // navegar entre páginas, não só na primeira vez). "IF NOT EXISTS" faz rodar
+  // sem problema toda vez que o servidor inicia, mesmo já existindo.
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_pedidos_status_entrega ON pedidos (status, entrega_status);
+    CREATE INDEX IF NOT EXISTS idx_pedidos_cliente_id ON pedidos (cliente_id);
+    CREATE INDEX IF NOT EXISTS idx_pedidos_entregador_id ON pedidos (entregador_id);
+    CREATE INDEX IF NOT EXISTS idx_pedidos_fechado_em ON pedidos (fechado_em);
+    CREATE INDEX IF NOT EXISTS idx_pedidos_entregue_em ON pedidos (entregue_em);
+    CREATE INDEX IF NOT EXISTS idx_pedidos_criado_em ON pedidos (criado_em);
+
+    CREATE INDEX IF NOT EXISTS idx_itens_pedido_pedido_id ON itens_pedido (pedido_id);
+    CREATE INDEX IF NOT EXISTS idx_itens_pedido_produto_id ON itens_pedido (produto_id);
+    CREATE INDEX IF NOT EXISTS idx_itens_pedido_status_troca ON itens_pedido (status_troca);
+
+    CREATE INDEX IF NOT EXISTS idx_localizacoes_entregador_id ON localizacoes_entregador (entregador_id);
+    CREATE INDEX IF NOT EXISTS idx_localizacoes_entregador_criado_em ON localizacoes_entregador (criado_em);
+
+    CREATE INDEX IF NOT EXISTS idx_despesas_criado_em ON despesas (criado_em);
+    CREATE INDEX IF NOT EXISTS idx_despesas_comprovantes_despesa_id ON despesas_comprovantes (despesa_id);
+
+    CREATE INDEX IF NOT EXISTS idx_movimentos_estoque_produto_id ON movimentos_estoque (produto_id);
+    CREATE INDEX IF NOT EXISTS idx_produtos_tipo_ativo ON produtos (tipo, ativo);
   `);
 
   console.log('>> Banco de dados pronto.');
