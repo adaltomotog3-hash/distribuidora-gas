@@ -104,6 +104,50 @@ router.post('/api/push-token', async (req, res) => {
   res.json({ ok: true });
 });
 
+// --- Resumo do entregador logado: quantas O.S. estão em aberto pra ele agora
+// e quantas ele já entregou (hoje/semana/mês/total), pra tela de Relatório do
+// app. As últimas entregas dele também vão junto, pra mostrar uma listinha.
+router.get('/api/resumo', async (req, res) => {
+  const entregadorId = req.entregador.id;
+
+  const [abertasResult, entreguesResult, ultimasResult] = await Promise.all([
+    pool.query(
+      `SELECT COUNT(*)::int AS total
+       FROM pedidos p
+       WHERE p.status = 'fechado' AND p.entrega_status = 'pendente'
+         AND (p.entregador_id IS NULL OR p.entregador_id = $1)`,
+      [entregadorId]
+    ),
+    pool.query(
+      `SELECT
+         COUNT(*) FILTER (WHERE entregue_em::date = CURRENT_DATE)::int AS hoje,
+         COUNT(*) FILTER (WHERE entregue_em >= date_trunc('week', CURRENT_DATE))::int AS semana,
+         COUNT(*) FILTER (WHERE entregue_em >= date_trunc('month', CURRENT_DATE))::int AS mes,
+         COUNT(*)::int AS total
+       FROM pedidos p
+       WHERE p.status = 'fechado' AND p.entrega_status = 'entregue' AND p.entregador_id = $1`,
+      [entregadorId]
+    ),
+    pool.query(
+      `SELECT p.id, p.entregue_em, c.nome AS cliente_nome,
+         (SELECT STRING_AGG(i.quantidade || 'x ' || CASE WHEN i.produto = 'agua' THEN 'Água' ELSE 'Gás' END, ', ' ORDER BY i.id)
+            FROM itens_pedido i WHERE i.pedido_id = p.id) AS resumo_itens
+       FROM pedidos p
+       LEFT JOIN clientes c ON c.id = p.cliente_id
+       WHERE p.status = 'fechado' AND p.entrega_status = 'entregue' AND p.entregador_id = $1
+       ORDER BY p.entregue_em DESC
+       LIMIT 20`,
+      [entregadorId]
+    )
+  ]);
+
+  res.json({
+    abertas: abertasResult.rows[0].total,
+    entregues: entreguesResult.rows[0],
+    ultimas: ultimasResult.rows
+  });
+});
+
 // --- Finaliza uma O.S. (pedido): marca como entregue e salva a localização do celular ---
 router.post('/api/entregas/:id/finalizar', async (req, res) => {
   const { latitude, longitude } = req.body;
