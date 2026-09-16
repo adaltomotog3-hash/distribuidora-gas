@@ -95,7 +95,8 @@
             marcadoresEntregador[e.id] = L.marker(posicao, { icon: iconeEntregador() }).addTo(mapa);
           }
           const quando = e.ultima_localizacao_em ? new Date(e.ultima_localizacao_em).toLocaleString('pt-BR') : '';
-          marcadoresEntregador[e.id].bindPopup(`<b>${e.nome}</b><br>Última posição: ${quando}`);
+          const linkMaps = `https://www.google.com/maps?q=${posicao[0]},${posicao[1]}`;
+          marcadoresEntregador[e.id].bindPopup(`<b>${e.nome}</b><br>Última posição: ${quando}<br><a href="${linkMaps}" target="_blank" rel="noopener">Abrir no Google Maps</a>`);
         });
 
         // Limpa marcadores antigos de entrega e desenha os de hoje
@@ -112,7 +113,8 @@
             fillOpacity: 0.85
           }).addTo(mapa);
           const quando = v.entregue_em ? new Date(v.entregue_em).toLocaleString('pt-BR') : '';
-          marcador.bindPopup(`<b>${rotuloDoProduto(v.produto)}</b> · O.S. Nº${v.id}<br>${v.cliente_nome || 'Avulso'}<br>${v.entregador_nome || ''}<br>${quando}`);
+          const linkMapsEntrega = `https://www.google.com/maps?q=${posicao[0]},${posicao[1]}`;
+          marcador.bindPopup(`<b>${rotuloDoProduto(v.produto)}</b> · O.S. Nº${v.id}<br>${v.cliente_nome || 'Avulso'}<br>${v.entregador_nome || ''}<br>${quando}<br><a href="${linkMapsEntrega}" target="_blank" rel="noopener">Abrir no Google Maps</a>`);
           marcadoresEntrega.push(marcador);
         });
 
