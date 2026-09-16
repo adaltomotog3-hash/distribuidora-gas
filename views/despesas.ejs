@@ -49,9 +49,10 @@
             <label>Motivo</label>
             <input type="text" name="motivo" placeholder="Ex: Combustível, manutenção, produto de limpeza">
           </div>
-          <div>
+          <div style="grid-column: 1 / -1;">
             <label>Comprovante (foto ou PDF)</label>
-            <input type="file" name="comprovantes" accept="image/*,application/pdf" multiple>
+            <input type="file" id="input-comprovantes" name="comprovantes" accept="image/*,application/pdf" multiple>
+            <div id="lista-arquivos-selecionados" class="texto-suave" style="font-size:12.5px; margin-top:6px;"></div>
             <p class="texto-suave" style="font-size:11.5px; margin-top:4px;">Pode anexar mais de um arquivo (até 5, 10MB cada).</p>
           </div>
           <div class="form-acoes">
@@ -152,6 +153,21 @@
   </div>
 
   <script>
+    var inputComprovantes = document.getElementById('input-comprovantes');
+    if (inputComprovantes) {
+      inputComprovantes.addEventListener('change', function () {
+        var lista = document.getElementById('lista-arquivos-selecionados');
+        if (!this.files || this.files.length === 0) {
+          lista.textContent = '';
+          return;
+        }
+        var nomes = Array.prototype.map.call(this.files, function (arquivo) {
+          return arquivo.name;
+        });
+        lista.textContent = '📎 ' + nomes.length + ' arquivo' + (nomes.length > 1 ? 's' : '') + ' selecionado' + (nomes.length > 1 ? 's' : '') + ': ' + nomes.join(', ');
+      });
+    }
+
     document.querySelectorAll('.excluir-despesa-form').forEach(function (form) {
       form.addEventListener('submit', function (e) {
         if (form.dataset.enviando) return;
