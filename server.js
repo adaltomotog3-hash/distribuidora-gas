@@ -22,6 +22,7 @@ const relatoriosRoutes = require('./routes/relatorios');
 const entregadoresRoutes = require('./routes/entregadores');
 const rastreioRoutes = require('./routes/rastreio');
 const apiRoutes = require('./routes/api');
+const apiPainelRoutes = require('./routes/apiPainel');
 
 const app = express();
 
@@ -82,6 +83,10 @@ app.use(authRoutes);
 // API usada pelo APP do entregador: autenticação própria por token (JWT),
 // não usa a sessão/cookie do painel — por isso fica fora do requireLogin.
 app.use(apiRoutes);
+
+// API usada pelo APP DO PAINEL (escritório): também autenticação própria
+// por token (JWT), separada da sessão/cookie do painel web.
+app.use(apiPainelRoutes);
 
 // A partir daqui, exige login no painel (usuário do escritório)
 app.use(requireLogin);
