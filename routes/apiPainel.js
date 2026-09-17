@@ -880,6 +880,48 @@ router.post('/api-painel/despesas', receberComprovantesApi, async (req, res) => 
   res.json({ ok: true, id: despesaId, comprovantesAnexados: comprovantesSalvos.length });
 });
 
+// Recebe UM único arquivo (campo "comprovante", sem "s") — usado pelo app
+// do painel, que envia cada foto num upload separado via
+// FileSystem.uploadAsync (mais confiável no celular do que montar um
+// FormData com Blob na mão, que se mostrou instável nessa versão do RN).
+function receberUmComprovanteApi(req, res, next) {
+  // >>> DIAGNÓSTICO TEMPORÁRIO <<<
+  console.log('[DIAG comprovante] pedido chegou na rota, content-type:', req.headers['content-type']);
+  uploadComprovantes.single('comprovante')(req, res, (err) => {
+    if (err) {
+      console.log('[DIAG comprovante] multer deu erro:', err.message);
+      return res.status(400).json({ erro: err.message || 'Não foi possível enviar o comprovante.' });
+    }
+    console.log('[DIAG comprovante] multer processou sem erro, req.file:', req.file ? (req.file.originalname + ' / ' + req.file.size + ' bytes') : 'VAZIO (nenhum arquivo)');
+    next();
+  });
+}
+
+// --- Anexa uma foto de comprovante numa despesa que já existe ---
+router.post('/api-painel/despesas/:id/comprovantes', receberUmComprovanteApi, async (req, res) => {
+  console.log('[DIAG comprovante] entrou no handler da rota, despesaId:', req.params.id);
+  const despesaResult = await pool.query('SELECT id FROM despesas WHERE id = $1', [req.params.id]);
+  if (!despesaResult.rows[0]) {
+    console.log('[DIAG comprovante] despesa não encontrada!');
+    return res.status(404).json({ erro: 'Despesa não encontrada.' });
+  }
+  if (!req.file) {
+    console.log('[DIAG comprovante] req.file vazio, respondendo 400.');
+    return res.status(400).json({ erro: 'Nenhum arquivo recebido.' });
+  }
+
+  const [comprovanteSalvo] = await salvarComprovantes([req.file]);
+  const { rows } = await pool.query(
+    `INSERT INTO despesas_comprovantes (despesa_id, nome_original, nome_arquivo, tipo_mime, tamanho_bytes)
+     VALUES ($1, $2, $3, $4, $5)
+     RETURNING id`,
+    [req.params.id, comprovanteSalvo.nome_original, comprovanteSalvo.nome_arquivo, comprovanteSalvo.tipo_mime, comprovanteSalvo.tamanho_bytes]
+  );
+  console.log('[DIAG comprovante] salvo com sucesso, id:', rows[0].id, 'arquivo:', comprovanteSalvo.nome_arquivo);
+
+  res.json({ ok: true, id: rows[0].id });
+});
+
 // --- Abre um comprovante específico (imagem ou PDF) pra visualizar no app ---
 router.get('/api-painel/despesas/comprovantes/:id', async (req, res) => {
   const { rows } = await pool.query('SELECT * FROM despesas_comprovantes WHERE id = $1', [req.params.id]);
