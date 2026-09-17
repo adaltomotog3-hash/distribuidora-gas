@@ -1,12 +1,15 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const path = require('path');
+const fs = require('fs');
 const pool = require('../db/pool');
 const { JWT_SECRET } = require('../middleware/apiAuth');
 const { requirePainelAuth } = require('../middleware/apiAuthPainel');
 const { protegerLogin } = require('../middleware/loginLimiter');
 const { notificarNovaEntrega } = require('../lib/pushNotifications');
 const { formatarEndereco } = require('../lib/endereco');
+const { uploadComprovantes, salvarComprovantes, PASTA_COMPROVANTES } = require('../lib/uploads');
 
 const router = express.Router();
 
@@ -790,9 +793,21 @@ router.post('/api-painel/pedidos/:id/marcar-fiado-pago', async (req, res) => {
 });
 
 // ===================== DESPESAS =====================
-// (obs: anexo de comprovante por foto continua exclusivo do painel web por enquanto)
 
 const FORMAS_VALIDAS_PAINEL = ['dinheiro', 'pix', 'cartao'];
+
+// Recebe os arquivos de comprovante (campo "comprovantes", até 5) antes da
+// rota principal — mesma regra do painel web, só que aqui responde em JSON
+// em vez de redirecionar quando dá erro (tipo inválido, arquivo grande
+// demais, mais de 5 arquivos).
+function receberComprovantesApi(req, res, next) {
+  uploadComprovantes.array('comprovantes', 5)(req, res, (err) => {
+    if (err) {
+      return res.status(400).json({ erro: err.message || 'Não foi possível enviar o(s) comprovante(s).' });
+    }
+    next();
+  });
+}
 
 router.get('/api-painel/despesas', async (req, res) => {
   const { inicio, fim } = req.query;
@@ -806,12 +821,30 @@ router.get('/api-painel/despesas', async (req, res) => {
     [dataInicio, dataFim]
   );
 
+  // Junta os comprovantes de cada despesa do período, igual ao painel web,
+  // pra o app poder mostrar quantos anexos cada despesa tem.
+  const idsDespesas = despesas.map((d) => d.id);
+  let comprovantesPorDespesa = {};
+  if (idsDespesas.length > 0) {
+    const { rows: comprovantes } = await pool.query(
+      `SELECT * FROM despesas_comprovantes WHERE despesa_id = ANY($1::int[]) ORDER BY id ASC`,
+      [idsDespesas]
+    );
+    comprovantesPorDespesa = comprovantes.reduce((acc, c) => {
+      (acc[c.despesa_id] = acc[c.despesa_id] || []).push(c);
+      return acc;
+    }, {});
+  }
+  despesas.forEach((d) => {
+    d.comprovantes = comprovantesPorDespesa[d.id] || [];
+  });
+
   const totalPeriodo = despesas.reduce((soma, d) => soma + Number(d.valor), 0);
 
   res.json({ despesas, dataInicio, dataFim, totalPeriodo });
 });
 
-router.post('/api-painel/despesas', async (req, res) => {
+router.post('/api-painel/despesas', receberComprovantesApi, async (req, res) => {
   const descricaoLimpa = (req.body.descricao || '').trim();
   const valor = Math.max(parseFloat(String(req.body.valor || '0').replace(',', '.')) || 0, 0);
   const formaPagamento = req.body.forma_pagamento;
@@ -830,12 +863,69 @@ router.post('/api-painel/despesas', async (req, res) => {
      RETURNING id`,
     [descricaoLimpa, valor, formaPagamento, destino || null, motivo || null, req.usuario.username]
   );
+  const despesaId = rows[0].id;
 
-  res.json({ ok: true, id: rows[0].id });
+  // Só grava os arquivos em disco (comprimindo as imagens) depois que a
+  // despesa já existe no banco — mesma regra do painel web, evita arquivo
+  // "órfão" no servidor por causa de um erro de validação anterior.
+  const comprovantesSalvos = await salvarComprovantes(req.files);
+  for (const c of comprovantesSalvos) {
+    await pool.query(
+      `INSERT INTO despesas_comprovantes (despesa_id, nome_original, nome_arquivo, tipo_mime, tamanho_bytes)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [despesaId, c.nome_original, c.nome_arquivo, c.tipo_mime, c.tamanho_bytes]
+    );
+  }
+
+  res.json({ ok: true, id: despesaId, comprovantesAnexados: comprovantesSalvos.length });
+});
+
+// --- Abre um comprovante específico (imagem ou PDF) pra visualizar no app ---
+router.get('/api-painel/despesas/comprovantes/:id', async (req, res) => {
+  const { rows } = await pool.query('SELECT * FROM despesas_comprovantes WHERE id = $1', [req.params.id]);
+  const comprovante = rows[0];
+
+  if (!comprovante) {
+    return res.status(404).json({ erro: 'Esse comprovante não existe ou já foi removido.' });
+  }
+
+  const caminho = path.join(PASTA_COMPROVANTES, comprovante.nome_arquivo);
+  res.setHeader('Content-Type', comprovante.tipo_mime || 'application/octet-stream');
+  res.sendFile(caminho, (err) => {
+    if (err && !res.headersSent) {
+      res.status(404).json({ erro: 'O arquivo desse comprovante não foi encontrado no servidor.' });
+    }
+  });
+});
+
+// --- Remove só um comprovante (mantém a despesa) ---
+router.post('/api-painel/despesas/comprovantes/:id/excluir', async (req, res) => {
+  const { rows } = await pool.query('SELECT * FROM despesas_comprovantes WHERE id = $1', [req.params.id]);
+  const comprovante = rows[0];
+
+  if (comprovante) {
+    await pool.query('DELETE FROM despesas_comprovantes WHERE id = $1', [comprovante.id]);
+    fs.unlink(path.join(PASTA_COMPROVANTES, comprovante.nome_arquivo), () => {});
+  }
+
+  res.json({ ok: true });
 });
 
 router.post('/api-painel/despesas/:id/excluir', async (req, res) => {
+  // Antes de excluir a despesa, pega os comprovantes dela pra também apagar
+  // os arquivos do disco (o ON DELETE CASCADE só apaga o registro no banco,
+  // não o arquivo em si).
+  const { rows: comprovantes } = await pool.query(
+    'SELECT nome_arquivo FROM despesas_comprovantes WHERE despesa_id = $1',
+    [req.params.id]
+  );
+
   await pool.query('DELETE FROM despesas WHERE id = $1', [req.params.id]);
+
+  comprovantes.forEach((c) => {
+    fs.unlink(path.join(PASTA_COMPROVANTES, c.nome_arquivo), () => {});
+  });
+
   res.json({ ok: true });
 });
 
