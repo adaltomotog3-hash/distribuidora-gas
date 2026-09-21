@@ -57,11 +57,26 @@ app.use(express.static(path.join(__dirname, 'public'), {
   maxAge: '7d'
 }));
 
+// Sem SESSION_SECRET no .env (ou com o valor padrão, que é público no GitHub),
+// usa um segredo aleatório temporário — seguro, só desloga todo mundo a cada
+// reinício (as sessões ficam na memória do processo de qualquer jeito).
+let sessionSecret = process.env.SESSION_SECRET;
+if (!sessionSecret || sessionSecret === 'segredo-troque-isso' || sessionSecret.length < 24) {
+  sessionSecret = require('crypto').randomBytes(48).toString('hex');
+  console.warn('>> ATENÇÃO DE SEGURANÇA: SESSION_SECRET ausente, fraco ou padrão no .env. Usando um segredo temporário. Defina um SESSION_SECRET forte no .env.');
+}
+if (!require('./lib/segredos').disponivel()) {
+  console.warn('>> Aviso: SEGREDOS_KEY não configurada no .env — chaves de API/CSC ainda não podem ser salvas (precisam de criptografia).');
+}
+
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'segredo-troque-isso',
+  name: 'lorin.sid',
+  secret: sessionSecret,
   resave: false,
   saveUninitialized: false,
   cookie: {
+    httpOnly: true, // o JavaScript da página não consegue ler o cookie de login
+    sameSite: 'lax', // o navegador não manda o cookie em requisições vindas de outros sites (protege contra CSRF)
     maxAge: 1000 * 60 * 60 * 12, // 12 horas
     // 'auto': manda o cookie só por HTTPS quando o acesso é por HTTPS (Render,
     // túnel Cloudflare) e continua funcionando normal em http://localhost no teste.
@@ -92,6 +107,14 @@ app.use(apiPainelRoutes);
 
 // A partir daqui, exige login no painel (usuário do escritório)
 app.use(requireLogin);
+
+// Páginas do painel têm dados de clientes/financeiro: pede pro navegador (e
+// qualquer proxy) NÃO guardar cópia delas em cache — assim, depois de sair, o
+// botão "voltar" não mostra dados de cliente numa tela guardada.
+app.use((req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store');
+  next();
+});
 app.use(dashboardRoutes);
 app.use(clientesRoutes);
 app.use(precosRoutes);

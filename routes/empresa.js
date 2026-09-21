@@ -1,6 +1,7 @@
 const express = require('express');
 const pool = require('../db/pool');
 const fiscal = require('../lib/fiscal');
+const segredos = require('../lib/segredos');
 
 const router = express.Router();
 
@@ -71,9 +72,14 @@ router.post('/empresa', async (req, res) => {
     return Number.isFinite(n) && n >= 1 ? n : padrao;
   };
 
-  // O código do CSC é um "segredo" da empresa: a tela nunca mostra ele de volta.
-  // Se o campo vier vazio, mantém o que já estava salvo.
-  const cscToken = texto(b.csc_token) || atual.csc_token || null;
+  // O código do CSC é um "segredo" da empresa: a tela nunca mostra ele de volta
+  // e ele é gravado CRIPTOGRAFADO no banco (chave SEGREDOS_KEY, no .env do
+  // servidor). Se o campo vier vazio, mantém o que já estava salvo.
+  if (texto(b.csc_token) && !segredos.disponivel()) {
+    req.setFlash('erro', 'Não deu para salvar o código do CSC: a chave de criptografia (SEGREDOS_KEY) ainda não foi configurada no servidor. Os outros dados não foram salvos — configure a chave e tente de novo.');
+    return res.redirect('/empresa');
+  }
+  const cscToken = segredos.prepararParaSalvar(b.csc_token, atual.csc_token);
 
   await pool.query(
     `UPDATE empresa_fiscal SET

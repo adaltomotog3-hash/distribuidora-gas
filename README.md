@@ -32,12 +32,17 @@ Além do app, dá pra finalizar uma entrega direto do painel — útil em qualqu
 
 No cadastro (e na edição) do cliente, o campo CEP tem um botão **Buscar** que preenche rua, bairro, cidade e UF automaticamente. O botão **📍 Marcar no mapa** abre um mapa pra clicar exatamente em cima da casa/local de entrega — isso fica salvo nas coordenadas do cliente e passa a aparecer como um link "mapa" na aba O.S., mesmo antes de qualquer entrega ser finalizada. Clientes cadastrados antes dessa atualização continuam funcionando normalmente — o endereço antigo (texto livre) some só se for reescrito.
 
-### Logins padrão criados na primeira vez que o sistema rodar
+### Login criado na primeira vez que o sistema rodar
 
-- Painel (escritório): `tiago` / `1122` e `lourinho` / `admin123`
-- App do entregador: `entregador` / `entrega123`
+Numa instalação nova (banco sem nenhum usuário), o sistema cria um usuário `admin` com uma **senha aleatória**, mostrada **uma única vez** no log de inicialização (`pm2 logs`). Anote na hora. Não existe mais nenhuma senha padrão fixa (o código é público, então uma senha fixa seria conhecida por todos).
 
-**Troque essas senhas depois de instalar de verdade na máquina do cliente** — o cadastro/redefinição de senha do entregador fica em **Entregador**, dentro do painel.
+Para criar outro usuário ou trocar a senha de um existente, rode dentro da pasta do projeto:
+
+```
+node gerenciar-usuario.js NOME_DO_USUARIO
+```
+
+O script pergunta a senha no terminal (ela não aparece na tela nem fica salva em arquivo). O cadastro/redefinição de senha do entregador fica em **Entregador**, dentro do painel.
 
 ## Rodando no seu computador (para testar)
 

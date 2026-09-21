@@ -1,5 +1,6 @@
 const express = require('express');
 const pool = require('../db/pool');
+const segredos = require('../lib/segredos');
 
 const router = express.Router();
 
@@ -126,9 +127,14 @@ router.post('/cobranca', async (req, res) => {
     return res.redirect('/cobranca');
   }
 
-  // A chave de acesso é um segredo: a tela nunca mostra ela de volta.
+  // A chave de acesso é um segredo: a tela nunca mostra ela de volta e ela é
+  // gravada CRIPTOGRAFADA no banco (chave SEGREDOS_KEY, no .env do servidor).
   // Campo vazio = mantém a que já estava salva.
-  const apiKey = texto(b.api_key) || atual.api_key || null;
+  if (texto(b.api_key) && !segredos.disponivel()) {
+    req.setFlash('erro', 'Não deu para salvar a chave de acesso: a chave de criptografia (SEGREDOS_KEY) ainda não foi configurada no servidor. Nada foi salvo — configure a chave e tente de novo.');
+    return res.redirect('/cobranca');
+  }
+  const apiKey = segredos.prepararParaSalvar(b.api_key, atual.api_key);
 
   await pool.query(
     `UPDATE cobranca_config SET

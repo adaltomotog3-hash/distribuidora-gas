@@ -1,7 +1,16 @@
 const jwt = require('jsonwebtoken');
 const pool = require('../db/pool');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'troque-esse-segredo-tambem';
+// Sem JWT_SECRET no .env, NÃO usamos um segredo "padrão" (o código é público no
+// GitHub, então qualquer um saberia qual é e poderia forjar um token de acesso).
+// Em vez disso gera um segredo aleatório a cada início do servidor — seguro, mas
+// os apps precisam entrar de novo depois de cada reinício. Configure JWT_SECRET
+// no .env do servidor para os logins dos apps durarem.
+let JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET || JWT_SECRET === 'troque-esse-segredo-tambem' || JWT_SECRET.length < 24) {
+  JWT_SECRET = require('crypto').randomBytes(48).toString('hex');
+  console.warn('>> ATENÇÃO DE SEGURANÇA: JWT_SECRET ausente, fraco ou padrão no .env. Usando um segredo temporário (os apps vão pedir login de novo a cada reinício). Defina um JWT_SECRET forte no .env.');
+}
 
 // Autenticação da API usada pelo APP do entregador (token, não sessão/cookie).
 async function requireApiAuth(req, res, next) {

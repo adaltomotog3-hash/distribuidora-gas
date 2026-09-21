@@ -263,33 +263,19 @@ async function initDb() {
   // (Os preços padrão de gás e água são garantidos mais abaixo, já usando o
   // catálogo de produtos — ver migração "catálogo de produtos".)
 
-  // Cria os usuários padrão do painel (admin) se ainda não existir nenhum
+  // Primeira instalação (banco sem nenhum usuário): cria UM usuário "admin" com
+  // uma senha ALEATÓRIA, mostrada uma única vez no log de inicialização (o código
+  // é público no GitHub, então nunca pode existir uma senha "padrão" fixa).
+  // Depois de entrar, crie os usuários de verdade e troque essa senha.
   const { rows } = await pool.query('SELECT COUNT(*)::int AS total FROM usuarios');
   if (rows[0].total === 0) {
-    const usuariosPadrao = [
-      { username: 'tiago', senha: '1122' },
-      { username: 'lourinho', senha: 'admin123' }
-    ];
-    for (const u of usuariosPadrao) {
-      const hash = await bcrypt.hash(u.senha, 10);
-      await pool.query(
-        'INSERT INTO usuarios (username, senha_hash) VALUES ($1, $2)',
-        [u.username, hash]
-      );
-      console.log('>> Usuario padrao criado: ' + u.username + ' / ' + u.senha);
-    }
-  }
-
-  // Cria um entregador padrão de teste, se ainda não existir nenhum
-  const entregadoresResult = await pool.query('SELECT COUNT(*)::int AS total FROM entregadores');
-  if (entregadoresResult.rows[0].total === 0) {
-    const senhaPadrao = 'entrega123';
-    const hash = await bcrypt.hash(senhaPadrao, 10);
+    const senhaInicial = require('crypto').randomBytes(9).toString('base64url');
+    const hash = await bcrypt.hash(senhaInicial, 10);
     await pool.query(
-      'INSERT INTO entregadores (nome, username, senha_hash) VALUES ($1, $2, $3)',
-      ['Entregador', 'entregador', hash]
+      'INSERT INTO usuarios (username, senha_hash) VALUES ($1, $2)',
+      ['admin', hash]
     );
-    console.log('>> Entregador padrao criado (login do APP): entregador / ' + senhaPadrao);
+    console.log('>> PRIMEIRA INSTALAÇÃO — usuário do painel criado: admin / ' + senhaInicial + '  (anote agora: essa senha não será mostrada de novo)');
   }
 
   // --- MIGRAÇÃO: catálogo de produtos (tipos/tamanhos que o próprio cliente edita) ---
