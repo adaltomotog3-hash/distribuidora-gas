@@ -143,13 +143,14 @@
           <div class="vazio-lista">Nenhum valor a receber no momento.</div>
         <% } else { %>
           <table>
-            <thead><tr><th>Cliente</th><th>Data da venda</th><th>Valor</th><th></th></tr></thead>
+            <thead><tr><th>Cliente</th><th>Data da venda</th><th>Valor</th><th>Boleto</th><th></th></tr></thead>
             <tbody>
               <% valoresAReceber.forEach(function(r) { %>
                 <tr>
                   <td><%= r.cliente_nome %></td>
                   <td class="texto-suave"><%= new Date(r.fechado_em).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) %></td>
                   <td><strong>R$ <%= Number(r.valor).toFixed(2) %></strong></td>
+                  <td><%- include('partials/botao-gerar-boleto') %></td>
                   <td>
                     <form method="POST" action="/pedidos/<%= r.id %>/marcar-fiado-pago" class="marcar-fiado-pago-form" style="display:flex; gap:6px; align-items:center;">
                       <select name="forma_pagamento_recebimento" required style="max-width:130px;">

@@ -1,6 +1,13 @@
 <div class="card-produto-estoque">
   <div class="card-produto-cabecalho">
-    <div class="nome-produto-estoque"><%= produto.nome %></div>
+    <div class="nome-produto-estoque">
+      <%= produto.nome %>
+      <% if (produto.ncm && produto.cfop && produto.cst_csosn) { %>
+        <br><span class="selo selo-fiscal-ok" title="NCM, CFOP e CST/CSOSN preenchidos">Fiscal ok</span>
+      <% } else { %>
+        <br><span class="selo selo-fiscal-pendente" title="Faltam NCM, CFOP ou CST/CSOSN — o contador define">Fiscal pendente</span>
+      <% } %>
+    </div>
     <div class="card-produto-quantidades">
       <div class="qtd-bloco qtd-bloco-cheio">
         <div class="qtd-numero"><%= produto.qtd_cheios %></div>
@@ -48,6 +55,39 @@
         </div>
       </form>
     </div>
+
+    <details class="fiscal-produto-form" style="margin-bottom:12px;">
+      <summary class="texto-suave" style="cursor:pointer;">Dados fiscais (nota fiscal — preencher com o contador)</summary>
+      <form method="POST" action="/estoque/produtos/<%= produto.id %>/fiscal" class="form-grade" style="padding:12px 0 0;">
+        <div>
+          <label>NCM (8 dígitos)</label>
+          <input type="text" name="ncm" value="<%= produto.ncm || '' %>" maxlength="10" inputmode="numeric">
+        </div>
+        <div>
+          <label>CFOP (4 dígitos)</label>
+          <input type="text" name="cfop" value="<%= produto.cfop || '' %>" maxlength="5" inputmode="numeric">
+        </div>
+        <div>
+          <label><%= (typeof usaCsosn === 'undefined' || usaCsosn) ? 'CSOSN (3 dígitos)' : 'CST (2 dígitos)' %></label>
+          <input type="text" name="cst_csosn" value="<%= produto.cst_csosn || '' %>" maxlength="3" inputmode="numeric">
+        </div>
+        <div>
+          <label>Origem (0 a 8)</label>
+          <input type="text" name="origem" value="<%= produto.origem || '0' %>" maxlength="1" inputmode="numeric">
+        </div>
+        <div>
+          <label>Unidade (ex: UN)</label>
+          <input type="text" name="unidade_comercial" value="<%= produto.unidade_comercial || 'UN' %>" maxlength="6" style="text-transform:uppercase;">
+        </div>
+        <div>
+          <label>CEST (opcional, 7 dígitos)</label>
+          <input type="text" name="cest" value="<%= produto.cest || '' %>" maxlength="9" inputmode="numeric">
+        </div>
+        <div class="form-acoes" style="grid-column:auto;">
+          <button class="botao botao-secundario botao-pequeno" type="submit">Salvar dados fiscais</button>
+        </div>
+      </form>
+    </details>
 
     <details>
       <summary class="texto-suave" style="cursor:pointer;">Registrar entrada/saída (compra do fornecedor, devolução de vazio)</summary>

@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <%- include('partials/head', { titulo: 'Dados da empresa' }) %>
+</head>
+<body>
+  <div class="app">
+    <%- include('partials/sidebar', { paginaAtual: 'empresa' }) %>
+
+    <div class="conteudo">
+
+      <%- include('partials/flash') %>
+      <div class="topo-pagina">
+        <div>
+          <h1>Dados da empresa</h1>
+          <p>Dados fiscais do emitente — preparação para a emissão de nota fiscal eletrônica</p>
+        </div>
+      </div>
+
+      <div class="painel">
+        <div class="painel-titulo">Prontidão para emitir nota (<%= prontos %> de <%= checklist.length %>)</div>
+        <p class="texto-suave painel-subtitulo">A emissão de nota ainda não está ativada no sistema. Esta lista mostra o que falta a empresa ter pronto (a maior parte é com o contador).</p>
+        <ul class="lista-checklist">
+          <% checklist.forEach(function(item) { %>
+            <li class="<%= item.ok ? 'check-ok' : 'check-pendente' %>">
+              <span class="check-icone"><%= item.ok ? '✅' : '⬜' %></span>
+              <span>
+                <%= item.texto %>
+                <% if (!item.ok && item.dica) { %><br><span class="texto-suave" style="font-size:12.5px;"><%= item.dica %></span><% } %>
+              </span>
+            </li>
+          <% }) %>
+        </ul>
+        <p class="texto-suave" style="padding: 0 20px 16px; margin:0; font-size:12.5px;">
+          Os códigos fiscais de cada produto (NCM, CFOP, CST/CSOSN) são preenchidos em <a href="/estoque">Estoque</a> → Gerenciar → Dados fiscais.
+        </p>
+      </div>
+
+      <form method="POST" action="/empresa">
+        <div class="painel">
+          <div class="painel-titulo">Identificação</div>
+          <div class="form-grade">
+            <div>
+              <label>Razão social</label>
+              <input type="text" name="razao_social" value="<%= empresa.razao_social || '' %>">
+            </div>
+            <div>
+              <label>Nome fantasia</label>
+              <input type="text" name="nome_fantasia" value="<%= empresa.nome_fantasia || '' %>">
+            </div>
+            <div>
+              <label>CNPJ</label>
+              <input type="text" name="cnpj" value="<%= empresa.cnpj ? formatarCpfCnpj(empresa.cnpj) : '' %>" placeholder="00.000.000/0000-00" maxlength="18">
+            </div>
+            <div>
+              <label>Inscrição estadual (IE)</label>
+              <input type="text" name="inscricao_estadual" value="<%= empresa.inscricao_estadual || '' %>">
+            </div>
+            <div>
+              <label>Inscrição municipal</label>
+              <input type="text" name="inscricao_municipal" value="<%= empresa.inscricao_municipal || '' %>">
+            </div>
+            <div>
+              <label>Regime tributário</label>
+              <select name="regime_tributario">
+                <option value="">— definir com o contador —</option>
+                <% Object.keys(REGIMES).forEach(function(chave) { %>
+                  <option value="<%= chave %>" <%= empresa.regime_tributario === chave ? 'selected' : '' %>><%= REGIMES[chave] %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div>
+              <label>Telefone</label>
+              <input type="text" name="telefone" value="<%= empresa.telefone || '' %>">
+            </div>
+            <div>
+              <label>E-mail</label>
+              <input type="email" name="email" value="<%= empresa.email || '' %>">
+            </div>
+          </div>
+        </div>
+
+        <div class="painel">
+          <div class="painel-titulo">Endereço do emitente</div>
+          <div class="form-grade">
+            <div>
+              <label>CEP</label>
+              <input type="text" name="cep" value="<%= empresa.cep || '' %>" placeholder="00000-000" maxlength="9">
+            </div>
+            <div>
+              <label>Logradouro (rua)</label>
+              <input type="text" name="logradouro" value="<%= empresa.logradouro || '' %>">
+            </div>
+            <div>
+              <label>Número</label>
+              <input type="text" name="numero" value="<%= empresa.numero || '' %>">
+            </div>
+            <div>
+              <label>Complemento</label>
+              <input type="text" name="complemento" value="<%= empresa.complemento || '' %>">
+            </div>
+            <div>
+              <label>Bairro</label>
+              <input type="text" name="bairro" value="<%= empresa.bairro || '' %>">
+            </div>
+            <div>
+              <label>Cidade</label>
+              <input type="text" name="cidade" value="<%= empresa.cidade || '' %>">
+            </div>
+            <div>
+              <label>UF</label>
+              <select name="uf">
+                <option value="">—</option>
+                <% UFS.forEach(function(u) { %>
+                  <option value="<%= u %>" <%= empresa.uf === u ? 'selected' : '' %>><%= u %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div>
+              <label>Código IBGE do município (7 dígitos)</label>
+              <input type="text" name="codigo_municipio_ibge" value="<%= empresa.codigo_municipio_ibge || '' %>" maxlength="7">
+            </div>
+          </div>
+        </div>
+
+        <div class="painel">
+          <div class="painel-titulo">Configuração da nota</div>
+          <p class="texto-suave painel-subtitulo">Deixe em "Homologação" (testes) até o contador liberar. Em homologação a nota não tem valor fiscal.</p>
+          <div class="form-grade">
+            <div>
+              <label>Ambiente</label>
+              <select name="ambiente">
+                <% Object.keys(AMBIENTES).forEach(function(chave) { %>
+                  <option value="<%= chave %>" <%= empresa.ambiente === chave ? 'selected' : '' %>><%= AMBIENTES[chave] %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div>
+              <label>Série da NF-e</label>
+              <input type="number" min="1" name="serie_nfe" value="<%= empresa.serie_nfe || 1 %>">
+            </div>
+            <div>
+              <label>Próximo número da NF-e</label>
+              <input type="number" min="1" name="proximo_numero_nfe" value="<%= empresa.proximo_numero_nfe || 1 %>">
+            </div>
+            <div>
+              <label>Série da NFC-e</label>
+              <input type="number" min="1" name="serie_nfce" value="<%= empresa.serie_nfce || 1 %>">
+            </div>
+            <div>
+              <label>Próximo número da NFC-e</label>
+              <input type="number" min="1" name="proximo_numero_nfce" value="<%= empresa.proximo_numero_nfce || 1 %>">
+            </div>
+            <div>
+              <label>CSC — ID (NFC-e)</label>
+              <input type="text" name="csc_id" value="<%= empresa.csc_id || '' %>">
+            </div>
+            <div>
+              <label>CSC — código (NFC-e)</label>
+              <input type="password" name="csc_token" value="" autocomplete="new-password"
+                     placeholder="<%= empresa.csc_token ? '•••••• (salvo — deixe em branco para manter)' : 'Cole o código do CSC' %>">
+            </div>
+          </div>
+          <p class="texto-suave" style="padding: 0 20px 16px; margin:0; font-size:12.5px;">
+            O certificado digital A1 <strong>não</strong> é guardado nesta fase — ele só será configurado quando a integração de emissão for ativada.
+          </p>
+        </div>
+
+        <div class="form-acoes" style="padding: 0 0 24px;">
+          <button class="botao" type="submit">Salvar dados da empresa</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</body>
+</html>

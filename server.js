@@ -21,6 +21,8 @@ const despesasRoutes = require('./routes/despesas');
 const relatoriosRoutes = require('./routes/relatorios');
 const entregadoresRoutes = require('./routes/entregadores');
 const rastreioRoutes = require('./routes/rastreio');
+const empresaRoutes = require('./routes/empresa');
+const cobrancaRoutes = require('./routes/cobranca');
 const apiRoutes = require('./routes/api');
 const apiPainelRoutes = require('./routes/apiPainel');
 
@@ -101,6 +103,8 @@ app.use(despesasRoutes);
 app.use(relatoriosRoutes);
 app.use(entregadoresRoutes);
 app.use(rastreioRoutes);
+app.use(empresaRoutes);
+app.use(cobrancaRoutes);
 
 // Página não encontrada (404)
 app.use((req, res) => {

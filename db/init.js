@@ -517,6 +517,117 @@ async function initDb() {
     );
   `);
 
+  // --- MIGRAÇÃO: dados fiscais (preparação para emitir NF-e/NFC-e) ---
+  // Fase 1: só guarda os dados. A emissão em si (integração com um serviço
+  // fiscal / Sefaz) ainda NÃO existe — nada aqui gera nota nem fala com a Sefaz.
+
+  // Dados da empresa emitente (uma linha só, igual às tabelas de estoque antigas)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS empresa_fiscal (
+      id INT PRIMARY KEY DEFAULT 1,
+      razao_social TEXT,
+      nome_fantasia TEXT,
+      cnpj TEXT,
+      inscricao_estadual TEXT,
+      inscricao_municipal TEXT,
+      regime_tributario TEXT, -- 'simples_nacional', 'simples_excesso', 'regime_normal' ou 'mei'
+      cep TEXT,
+      logradouro TEXT,
+      numero TEXT,
+      complemento TEXT,
+      bairro TEXT,
+      cidade TEXT,
+      uf TEXT,
+      codigo_municipio_ibge TEXT,
+      telefone TEXT,
+      email TEXT,
+      ambiente TEXT NOT NULL DEFAULT 'homologacao', -- 'homologacao' (teste) ou 'producao'
+      serie_nfe INT NOT NULL DEFAULT 1,
+      serie_nfce INT NOT NULL DEFAULT 1,
+      proximo_numero_nfe INT NOT NULL DEFAULT 1,
+      proximo_numero_nfce INT NOT NULL DEFAULT 1,
+      csc_id TEXT,
+      csc_token TEXT,
+      atualizado_em TIMESTAMP DEFAULT NOW(),
+      CONSTRAINT unica_linha_empresa_fiscal CHECK (id = 1)
+    );
+  `);
+  await pool.query(`INSERT INTO empresa_fiscal (id) VALUES (1) ON CONFLICT (id) DO NOTHING`);
+
+  // Códigos fiscais de cada produto (quem define é o contador)
+  const colunasFiscaisProduto = [
+    ['ncm', 'TEXT'],
+    ['cfop', 'TEXT'],
+    ['cst_csosn', 'TEXT'],
+    ['origem', `TEXT NOT NULL DEFAULT '0'`],
+    ['unidade_comercial', `TEXT NOT NULL DEFAULT 'UN'`],
+    ['cest', 'TEXT']
+  ];
+  for (const [coluna, definicao] of colunasFiscaisProduto) {
+    if (!(await columnExists('produtos', coluna))) {
+      await pool.query(`ALTER TABLE produtos ADD COLUMN ${coluna} ${definicao}`);
+    }
+  }
+
+  // Dados do cliente necessários para o destinatário da nota (todos opcionais)
+  const colunasFiscaisCliente = [
+    ['cpf_cnpj', 'TEXT'],
+    ['inscricao_estadual', 'TEXT'],
+    ['email', 'TEXT']
+  ];
+  for (const [coluna, definicao] of colunasFiscaisCliente) {
+    if (!(await columnExists('clientes', coluna))) {
+      await pool.query(`ALTER TABLE clientes ADD COLUMN ${coluna} ${definicao}`);
+    }
+  }
+
+  // --- MIGRAÇÃO: cobrança por boleto (preparação) ---
+  // Fase 1: só guarda a configuração e deixa a tabela de boletos pronta. Nenhum
+  // boleto é gerado e nada é enviado a banco/serviço de cobrança ainda.
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS cobranca_config (
+      id INT PRIMARY KEY DEFAULT 1,
+      provedor TEXT, -- 'asaas', 'efi', 'outro' (serviço de cobrança) ou 'banco_direto'
+      ambiente TEXT NOT NULL DEFAULT 'sandbox', -- 'sandbox' (teste) ou 'producao'
+      api_key TEXT, -- chave de acesso do serviço de cobrança (nunca é exibida de volta na tela)
+      dias_vencimento_padrao INT NOT NULL DEFAULT 7,
+      multa_percentual NUMERIC(5,2) NOT NULL DEFAULT 2,
+      juros_mensal_percentual NUMERIC(5,2) NOT NULL DEFAULT 1,
+      instrucoes TEXT, -- texto que sai no boleto (ex: "Não receber após 30 dias do vencimento")
+      -- Só usados se a cobrança for feita direto pelo banco (opção sem serviço intermediário):
+      banco_nome TEXT,
+      banco_agencia TEXT,
+      banco_conta TEXT,
+      banco_carteira TEXT,
+      banco_convenio TEXT,
+      atualizado_em TIMESTAMP DEFAULT NOW(),
+      CONSTRAINT unica_linha_cobranca_config CHECK (id = 1)
+    );
+  `);
+  await pool.query(`INSERT INTO cobranca_config (id) VALUES (1) ON CONFLICT (id) DO NOTHING`);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS boletos (
+      id SERIAL PRIMARY KEY,
+      pedido_id INT REFERENCES pedidos(id) ON DELETE SET NULL,
+      cliente_id INT REFERENCES clientes(id) ON DELETE SET NULL,
+      valor NUMERIC(10,2) NOT NULL,
+      vencimento DATE NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pendente', -- 'pendente', 'emitido', 'pago', 'vencido' ou 'cancelado'
+      provedor_id TEXT, -- código do boleto no serviço de cobrança
+      nosso_numero TEXT,
+      linha_digitavel TEXT,
+      codigo_barras TEXT,
+      link_boleto TEXT,
+      pago_em TIMESTAMP,
+      criado_em TIMESTAMP DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_boletos_pedido_id ON boletos (pedido_id);
+    CREATE INDEX IF NOT EXISTS idx_boletos_cliente_id ON boletos (cliente_id);
+    CREATE INDEX IF NOT EXISTS idx_boletos_status_vencimento ON boletos (status, vencimento);
+  `);
+
   // --- Índices de performance ---
   // O Postgres NÃO cria índice automático em coluna de chave estrangeira (só
   // no lado que é chave primária/única) — sem esses índices, toda consulta

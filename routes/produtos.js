@@ -1,5 +1,6 @@
 const express = require('express');
 const pool = require('../db/pool');
+const fiscal = require('../lib/fiscal');
 
 const router = express.Router();
 
@@ -27,7 +28,12 @@ router.get('/estoque', async (req, res) => {
   const produtosGas = produtosResult.rows.filter((p) => p.tipo === 'gas');
   const produtosAgua = produtosResult.rows.filter((p) => p.tipo === 'agua');
 
+  const empresaResult = await pool.query('SELECT regime_tributario FROM empresa_fiscal WHERE id = 1');
+  const regime = empresaResult.rows[0] ? empresaResult.rows[0].regime_tributario : null;
+
   res.render('estoque', {
+    regime,
+    usaCsosn: fiscal.usaCsosn(regime),
     produtosGas,
     produtosAgua,
     movimentos: movimentosResult.rows,
@@ -85,6 +91,34 @@ router.post('/estoque/produtos/:id/editar', async (req, res) => {
   }
   await pool.query('UPDATE produtos SET nome = $1, atualizado_em = NOW() WHERE id = $2', [nomeLimpo, req.params.id]);
   req.setFlash('sucesso', 'Produto atualizado.');
+  res.redirect('/estoque');
+});
+
+// --- Dados fiscais do produto (NCM, CFOP, CST/CSOSN etc. — quem define é o contador) ---
+router.post('/estoque/produtos/:id/fiscal', async (req, res) => {
+  const b = req.body;
+  const checagens = [
+    fiscal.validarNcm(b.ncm),
+    fiscal.validarCfop(b.cfop),
+    fiscal.validarCstCsosn(b.cst_csosn),
+    fiscal.validarOrigem(b.origem),
+    fiscal.validarUnidade(b.unidade_comercial),
+    fiscal.validarCest(b.cest)
+  ];
+  const erro = checagens.find((c) => !c.ok);
+  if (erro) {
+    req.setFlash('erro', erro.erro);
+    return res.redirect('/estoque');
+  }
+  const [ncm, cfop, cstCsosn, origem, unidade, cest] = checagens.map((c) => c.valor);
+
+  const { rowCount } = await pool.query(
+    `UPDATE produtos SET ncm = $1, cfop = $2, cst_csosn = $3, origem = $4, unidade_comercial = $5, cest = $6,
+       atualizado_em = NOW()
+     WHERE id = $7`,
+    [ncm, cfop, cstCsosn, origem, unidade, cest, req.params.id]
+  );
+  req.setFlash(rowCount ? 'sucesso' : 'erro', rowCount ? 'Dados fiscais do produto salvos.' : 'Produto não encontrado.');
   res.redirect('/estoque');
 });
 

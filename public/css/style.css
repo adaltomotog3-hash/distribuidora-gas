@@ -675,3 +675,13 @@ a:hover .selo-os { background: rgba(244,119,46,0.14); color: var(--chama-escura)
   .comprovante-detalhes { display: block; }
   body { font-size: 13px; }
 }
+
+/* ---- Dados fiscais / prontidão para nota fiscal ---- */
+.lista-checklist { list-style: none; margin: 0; padding: 4px 20px 12px; }
+.lista-checklist li { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid var(--borda); font-size: 14px; }
+.lista-checklist li:last-child { border-bottom: none; }
+.lista-checklist .check-icone { flex: 0 0 auto; }
+.lista-checklist .check-pendente { color: var(--texto); }
+.selo-fiscal-ok { background: rgba(46,158,91,0.1); color: var(--verde-ok); }
+.selo-fiscal-pendente { background: rgba(107,114,128,0.14); color: var(--texto-suave); }
+.fiscal-produto-form { border-top: 1px dashed var(--borda); padding-top: 12px; margin-top: 4px; }

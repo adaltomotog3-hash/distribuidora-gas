@@ -126,6 +126,7 @@
                 <th>Entregador</th>
                 <th>Entregue em</th>
                 <th>Vazio</th>
+                <th>Nota</th>
                 <th></th>
               </tr>
             </thead>
@@ -155,6 +156,7 @@
                       <span class="selo selo-concluida">OK</span>
                     <% } %>
                   </td>
+                  <td><%- include('partials/botao-emitir-nota', { pequeno: true }) %></td>
                   <td>
                     <form method="POST" action="/pedidos/<%= p.id %>/dar-baixa" class="dar-baixa-form-inline">
                       <label style="display:flex; align-items:center; gap:5px; font-weight:500; font-size:12.5px; color:var(--texto-suave); margin-bottom:6px;">
@@ -188,6 +190,7 @@
                 <th>Entregue em</th>
                 <th>Baixa dada por</th>
                 <th>Local</th>
+                <th>Nota</th>
               </tr>
             </thead>
             <tbody>
@@ -217,6 +220,7 @@
                       —
                     <% } %>
                   </td>
+                  <td><%- include('partials/botao-emitir-nota', { pequeno: true }) %></td>
                 </tr>
               <% }) %>
             </tbody>

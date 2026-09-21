@@ -28,6 +28,18 @@
             <label>Telefone</label>
             <input type="text" name="telefone">
           </div>
+          <div>
+            <label>CPF / CNPJ (para nota fiscal)</label>
+            <input type="text" name="cpf_cnpj" placeholder="Opcional" maxlength="18" inputmode="numeric">
+          </div>
+          <div>
+            <label>E-mail (para enviar a nota)</label>
+            <input type="email" name="email" placeholder="Opcional">
+          </div>
+          <div>
+            <label>Inscrição estadual (só se for empresa)</label>
+            <input type="text" name="inscricao_estadual" placeholder="Opcional">
+          </div>
           <%- include('partials/campos-endereco') %>
           <div style="grid-column: 1 / -1;">
             <label>Observação</label>
@@ -49,6 +61,7 @@
               <tr>
                 <th>Nome</th>
                 <th>Telefone</th>
+                <th>CPF/CNPJ</th>
                 <th>Endereço</th>
                 <th>Observação</th>
                 <th></th>
@@ -59,6 +72,7 @@
                 <tr>
                   <td><%= c.nome %></td>
                   <td><%= c.telefone || '—' %></td>
+                  <td class="texto-suave"><%= c.cpf_cnpj ? formatarCpfCnpj(c.cpf_cnpj) : '—' %></td>
                   <td class="texto-suave"><%= c.endereco_formatado || '—' %><%= (c.latitude && c.longitude) ? ' 📍' : '' %></td>
                   <td class="texto-suave"><%= c.observacao || '—' %></td>
                   <td style="display:flex; gap:8px;">

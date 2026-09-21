@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <%- include('partials/head', { titulo: 'Cobrança' }) %>
+</head>
+<body>
+  <div class="app">
+    <%- include('partials/sidebar', { paginaAtual: 'cobranca' }) %>
+
+    <div class="conteudo">
+
+      <%- include('partials/flash') %>
+      <div class="topo-pagina">
+        <div>
+          <h1>Cobrança por boleto</h1>
+          <p>Configuração para gerar boletos dos valores a receber (fiado)</p>
+        </div>
+      </div>
+
+      <div class="painel">
+        <div class="painel-titulo">Prontidão para gerar boletos (<%= prontos %> de <%= checklist.length %>)</div>
+        <p class="texto-suave painel-subtitulo">A geração de boleto ainda não está ativada no sistema. Esta lista mostra o que falta ficar pronto.</p>
+        <ul class="lista-checklist">
+          <% checklist.forEach(function(item) { %>
+            <li class="<%= item.ok ? 'check-ok' : 'check-pendente' %>">
+              <span class="check-icone"><%= item.ok ? '✅' : '⬜' %></span>
+              <span>
+                <%= item.texto %>
+                <% if (!item.ok && item.dica) { %><br><span class="texto-suave" style="font-size:12.5px;"><%= item.dica %></span><% } %>
+              </span>
+            </li>
+          <% }) %>
+        </ul>
+      </div>
+
+      <form method="POST" action="/cobranca">
+        <div class="painel">
+          <div class="painel-titulo">Como os boletos serão gerados</div>
+          <div class="form-grade">
+            <div>
+              <label>Forma de cobrança</label>
+              <select name="provedor" id="campo-provedor">
+                <option value="">— escolher —</option>
+                <% Object.keys(PROVEDORES).forEach(function(chave) { %>
+                  <option value="<%= chave %>" <%= config.provedor === chave ? 'selected' : '' %>><%= PROVEDORES[chave] %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div>
+              <label>Ambiente</label>
+              <select name="ambiente">
+                <% Object.keys(AMBIENTES).forEach(function(chave) { %>
+                  <option value="<%= chave %>" <%= config.ambiente === chave ? 'selected' : '' %>><%= AMBIENTES[chave] %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div>
+              <label>Chave de acesso (API) do serviço</label>
+              <input type="password" name="api_key" value="" autocomplete="new-password"
+                     placeholder="<%= config.api_key ? '•••••• (salva — deixe em branco para manter)' : 'Cole a chave gerada no serviço' %>">
+            </div>
+          </div>
+          <p class="texto-suave" style="padding: 0 20px 16px; margin:0; font-size:12.5px;">
+            Deixe em "Sandbox" (testes) até a integração ser ativada e testada. A chave nunca é mostrada de volta na tela.
+          </p>
+        </div>
+
+        <div class="painel">
+          <div class="painel-titulo">Regras do boleto</div>
+          <div class="form-grade">
+            <div>
+              <label>Dias até o vencimento (padrão)</label>
+              <input type="number" min="0" max="90" name="dias_vencimento_padrao" value="<%= config.dias_vencimento_padrao %>">
+            </div>
+            <div>
+              <label>Multa por atraso (%)</label>
+              <input type="text" name="multa_percentual" value="<%= Number(config.multa_percentual).toFixed(2) %>" inputmode="decimal">
+            </div>
+            <div>
+              <label>Juros ao mês (%)</label>
+              <input type="text" name="juros_mensal_percentual" value="<%= Number(config.juros_mensal_percentual).toFixed(2) %>" inputmode="decimal">
+            </div>
+            <div style="grid-column: 1 / -1;">
+              <label>Instruções que saem no boleto (opcional)</label>
+              <input type="text" name="instrucoes" value="<%= config.instrucoes || '' %>" placeholder="Ex: Não receber após 30 dias do vencimento">
+            </div>
+          </div>
+          <p class="texto-suave" style="padding: 0 20px 16px; margin:0; font-size:12.5px;">
+            Em venda para consumidor, a multa costuma ter limite de 2%. Confirme os percentuais com o contador.
+          </p>
+        </div>
+
+        <div class="painel" id="bloco-banco-direto">
+          <div class="painel-titulo">Dados do banco (só se a cobrança for direta pelo banco)</div>
+          <div class="form-grade">
+            <div>
+              <label>Banco</label>
+              <input type="text" name="banco_nome" value="<%= config.banco_nome || '' %>" placeholder="Ex: Banco do Brasil, Sicoob">
+            </div>
+            <div>
+              <label>Agência</label>
+              <input type="text" name="banco_agencia" value="<%= config.banco_agencia || '' %>">
+            </div>
+            <div>
+              <label>Conta</label>
+              <input type="text" name="banco_conta" value="<%= config.banco_conta || '' %>">
+            </div>
+            <div>
+              <label>Carteira</label>
+              <input type="text" name="banco_carteira" value="<%= config.banco_carteira || '' %>">
+            </div>
+            <div>
+              <label>Convênio</label>
+              <input type="text" name="banco_convenio" value="<%= config.banco_convenio || '' %>">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-acoes" style="padding: 0 0 24px;">
+          <button class="botao" type="submit">Salvar configuração de cobrança</button>
+        </div>
+      </form>
+
+      <div class="painel">
+        <div class="painel-titulo">Boletos (<%= boletos.length %>)</div>
+        <% if (boletos.length === 0) { %>
+          <div class="vazio-lista">Nenhum boleto ainda. Eles vão aparecer aqui quando a geração for ativada.</div>
+        <% } else { %>
+          <div class="painel-tabela-rolagem">
+          <table>
+            <thead>
+              <tr><th>Cliente</th><th>Valor</th><th>Vencimento</th><th>Situação</th><th></th></tr>
+            </thead>
+            <tbody>
+              <% boletos.forEach(function(bo) { %>
+                <tr>
+                  <td><%= bo.cliente_nome %></td>
+                  <td>R$ <%= Number(bo.valor).toFixed(2) %></td>
+                  <td class="texto-suave"><%= new Date(bo.vencimento).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) %></td>
+                  <td><%= STATUS_BOLETO[bo.status] || bo.status %></td>
+                  <td><% if (bo.link_boleto) { %><a target="_blank" href="<%= bo.link_boleto %>">Abrir boleto</a><% } %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+          </div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // O bloco de dados do banco só aparece quando a forma escolhida é "direto pelo banco"
+    (function () {
+      var select = document.getElementById('campo-provedor');
+      var bloco = document.getElementById('bloco-banco-direto');
+      function atualizar() { bloco.style.display = select.value === 'banco_direto' ? '' : 'none'; }
+      select.addEventListener('change', atualizar);
+      atualizar();
+    })();
+  </script>
+</body>
+</html>

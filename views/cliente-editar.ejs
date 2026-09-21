@@ -29,6 +29,18 @@
             <label>Telefone</label>
             <input type="text" name="telefone" value="<%= cliente.telefone || '' %>">
           </div>
+          <div>
+            <label>CPF / CNPJ (para nota fiscal)</label>
+            <input type="text" name="cpf_cnpj" placeholder="Opcional" maxlength="18" inputmode="numeric" value="<%= cliente.cpf_cnpj ? formatarCpfCnpj(cliente.cpf_cnpj) : '' %>">
+          </div>
+          <div>
+            <label>E-mail (para enviar a nota)</label>
+            <input type="email" name="email" placeholder="Opcional" value="<%= cliente.email || '' %>">
+          </div>
+          <div>
+            <label>Inscrição estadual (só se for empresa)</label>
+            <input type="text" name="inscricao_estadual" placeholder="Opcional" value="<%= cliente.inscricao_estadual || '' %>">
+          </div>
           <%- include('partials/campos-endereco', { cliente }) %>
           <div style="grid-column: 1 / -1;">
             <label>Observação</label>
